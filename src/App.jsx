@@ -1,4 +1,10 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { createClient } from "@supabase/supabase-js";
+
+// ─── Supabase ─────────────────────────────────────────────────────────────────
+const SUPABASE_URL = "https://yjtmdotjhjjysovjhckr.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqdG1kb3RqaGpqeXNvdmpoY2tyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2MDE3MzYsImV4cCI6MjA4OTE3NzczNn0.sGWBZ8_Pt6ktumXYFDxP2B5YrCQtYA2NVmQSsfUouiQ";
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -61,7 +67,7 @@ const EMPTY_FORM = {
   pipelineStage:"Identified",notes:"",noteHistory:[],
 };
 
-const STORAGE_KEY = "fintech-scout-v4";
+// Supabase is the source of truth
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -798,29 +804,69 @@ export default function App() {
   const [saveStatus,setSaveStatus]=useState("saved");
   const fileInputRef=useRef();
 
-  // Load from localStorage
+  // ── Load from Supabase on mount + real-time subscriptions ──
   useEffect(()=>{
-    try {
-      const saved=localStorage.getItem(STORAGE_KEY);
-      if(saved){
-        const d=JSON.parse(saved);
-        if(d.vendors)setVendors(d.vendors);
-        if(d.departments)setDepartments(d.departments);
-        if(d.conferences)setConferences(d.conferences);
-        if(d.weights)setWeights(d.weights);
-        if(d.mustHaves)setMustHaves(d.mustHaves);
-      }
-    }catch(e){}
-  },[]);
+    const load = async () => {
+      setSaveStatus("saving");
+      try {
+        const { data: vendorRows } = await supabase.from("vendors").select("id, data");
+        if (vendorRows) setVendors(vendorRows.map(r => ({ ...r.data, id: r.id })));
+        const { data: configRows } = await supabase.from("app_config").select("key, value");
+        if (configRows) configRows.forEach(row => {
+          if (row.key === "departments") setDepartments(row.value);
+          if (row.key === "conferences") setConferences(row.value);
+          if (row.key === "weights") setWeights(row.value);
+          if (row.key === "mustHaves") setMustHaves(row.value);
+        });
+        setSaveStatus("saved");
+      } catch(e) { setSaveStatus("error"); }
+    };
+    load();
 
-  const persist=useCallback((v,d,c,w,mh)=>{
+    const vendorSub = supabase.channel("vendors-rt")
+      .on("postgres_changes", { event: "*", schema: "public", table: "vendors" }, () => {
+        supabase.from("vendors").select("id, data").then(({ data }) => {
+          if (data) setVendors(data.map(r => ({ ...r.data, id: r.id })));
+        });
+      }).subscribe();
+
+    const configSub = supabase.channel("config-rt")
+      .on("postgres_changes", { event: "*", schema: "public", table: "app_config" }, ({ new: row }) => {
+        if (row.key === "departments") setDepartments(row.value);
+        if (row.key === "conferences") setConferences(row.value);
+        if (row.key === "weights") setWeights(row.value);
+        if (row.key === "mustHaves") setMustHaves(row.value);
+      }).subscribe();
+
+    return () => { supabase.removeChannel(vendorSub); supabase.removeChannel(configSub); };
+  }, []);
+
+  const persistVendors = useCallback(async (vendorList) => {
     setSaveStatus("saving");
-    try{localStorage.setItem(STORAGE_KEY,JSON.stringify({vendors:v,departments:d,conferences:c,weights:w,mustHaves:mh}));setSaveStatus("saved");}
-    catch(e){setSaveStatus("error");}
-  },[]);
+    try {
+      // Delete removed vendors then upsert remaining
+      const ids = vendorList.map(v => v.id);
+      await supabase.from("vendors").delete().not("id", "in", ids.length ? `(${ids.join(",")})` : "(0)");
+      if (ids.length) await supabase.from("vendors").upsert(vendorList.map(v => ({ id: v.id, data: v })), { onConflict: "id" });
+      setSaveStatus("saved");
+    } catch(e) { setSaveStatus("error"); }
+  }, []);
 
-  const addDepartment=d=>setDepartments(p=>{const n=p.includes(d)?p:[...p,d];persist(vendors,n,conferences,weights,mustHaves);return n;});
-  const addConference=c=>setConferences(p=>{const n=p.includes(c)?p:[...p,c];persist(vendors,departments,n,weights,mustHaves);return n;});
+  const persistConfig = useCallback(async (key, value) => {
+    try { await supabase.from("app_config").upsert({ key, value }, { onConflict: "key" }); }
+    catch(e) { setSaveStatus("error"); }
+  }, []);
+
+  const persist = useCallback(async (v, d, c, w, mh) => {
+    await persistVendors(v);
+    await persistConfig("departments", d);
+    await persistConfig("conferences", c);
+    await persistConfig("weights", w);
+    await persistConfig("mustHaves", mh);
+  }, [persistVendors, persistConfig]);
+
+  const addDepartment=d=>setDepartments(p=>{const n=p.includes(d)?p:[...p,d];persistConfig("departments",n);return n;});
+  const addConference=c=>setConferences(p=>{const n=p.includes(c)?p:[...p,c];persistConfig("conferences",n);return n;});
 
   const enriched=useMemo(()=>vendors.map(v=>({
     ...v,
@@ -854,22 +900,22 @@ export default function App() {
     const dupeCheck=vendors.find(x=>x.id!==v.id&&x.fintechName.toLowerCase()===v.fintechName.toLowerCase());
     if(dupeCheck&&!v.id){setDupeWarning(v);return;}
     const next=vendors.find(x=>x.id===v.id)?vendors.map(x=>x.id===v.id?v:x):[...vendors,v];
-    setVendors(next);persist(next,departments,conferences,weights,mustHaves);
+    setVendors(next);persistVendors(next);
     setShowForm(false);setEditItem(null);setDupeWarning(null);
   };
 
-  const deleteVendor=id=>{
-    const next=vendors.filter(x=>x.id!==id);
-    setVendors(next);persist(next,departments,conferences,weights,mustHaves);setDeleteConfirm(null);
+  const deleteVendor=async id=>{
+    await supabase.from("vendors").delete().eq("id",id);
+    setVendors(p=>p.filter(x=>x.id!==id));
+    setDeleteConfirm(null);
   };
 
-  const handleWeightsChange=w=>{setWeights(w);persist(vendors,departments,conferences,w,mustHaves);};
-  const handleMustHavesChange=mh=>{setMustHaves(mh);persist(vendors,departments,conferences,weights,mh);};
+  const handleWeightsChange=w=>{setWeights(w);persistConfig("weights",w);};
+  const handleMustHavesChange=mh=>{setMustHaves(mh);persistConfig("mustHaves",mh);};
 
   const handleSwipeAction=(vendor,newStage)=>{
-    const updated={...vendor,pipelineStage:newStage};
     const next=vendors.map(v=>v.id===vendor.id?{...v,pipelineStage:newStage}:v);
-    setVendors(next);persist(next,departments,conferences,weights,mustHaves);
+    setVendors(next);persistVendors(next);
   };
 
   const handleImport=()=>{
@@ -888,7 +934,7 @@ export default function App() {
           referenceContact:cols[21]||"",notes:cols[22]||"",noteHistory:[]};
       });
       const next=[...vendors,...imported];
-      setVendors(next);persist(next,departments,conferences,weights,mustHaves);
+      setVendors(next);persistVendors(next);
       setShowImport(false);setImportText("");
     }catch(e){alert("Import failed — check your CSV format.");}
   };
@@ -905,7 +951,7 @@ export default function App() {
         if(d.conferences)setConferences(d.conferences);
         if(d.weights)setWeights(d.weights);
         if(d.mustHaves)setMustHaves(d.mustHaves);
-        persist(d.vendors||[],d.departments||DEFAULT_DEPARTMENTS,d.conferences||DEFAULT_CONFERENCES,d.weights||DEFAULT_WEIGHTS,d.mustHaves||DEFAULT_MUST_HAVES);
+        persist(d.vendors||[],d.departments||DEFAULT_DEPARTMENTS,d.conferences||DEFAULT_CONFERENCES,d.weights||DEFAULT_WEIGHTS,d.mustHaves||DEFAULT_MUST_HAVES).then(()=>setSaveStatus("saved"));
         alert(`✓ Restored ${d.vendors?.length||0} vendors successfully.`);
       }catch(err){alert("Restore failed — invalid file.");}
     };
@@ -1031,7 +1077,7 @@ export default function App() {
               <button onClick={()=>fileInputRef.current?.click()} style={{padding:"10px 16px",background:"rgba(255,215,61,0.1)",border:"1px solid rgba(255,215,61,0.2)",borderRadius:8,color:"#ffd93d",cursor:"pointer",fontSize:13,minHeight:44}}>📤 Restore JSON</button>
               <button onClick={()=>setShowImport(true)} style={{padding:"10px 16px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,color:"#889",cursor:"pointer",fontSize:13,minHeight:44}}>📋 Import CSV</button>
               <input ref={fileInputRef} type="file" accept=".json" onChange={handleRestoreJSON} style={{display:"none"}}/>
-              {vendors.length>0&&<button onClick={()=>{if(window.confirm("Clear ALL vendor data? This cannot be undone.")){setVendors([]);persist([],departments,conferences,weights,mustHaves);}}} style={{padding:"10px 16px",background:"rgba(231,76,60,0.08)",border:"1px solid rgba(231,76,60,0.2)",borderRadius:8,color:"#e74c3c",cursor:"pointer",fontSize:13,minHeight:44}}>🗑 Clear All</button>}
+              {vendors.length>0&&<button onClick={()=>{if(window.confirm("Clear ALL vendor data? This cannot be undone.")){setVendors([]);supabase.from("vendors").delete().neq("id",0);}}} style={{padding:"10px 16px",background:"rgba(231,76,60,0.08)",border:"1px solid rgba(231,76,60,0.2)",borderRadius:8,color:"#e74c3c",cursor:"pointer",fontSize:13,minHeight:44}}>🗑 Clear All</button>}
             </div>
           </div>
 
@@ -1179,7 +1225,7 @@ export default function App() {
             <p style={{color:"#889",marginBottom:24}}>A vendor named "<strong style={{color:"#fff"}}>{dupeWarning.fintechName}</strong>" already exists. Save anyway?</p>
             <div style={{display:"flex",gap:10,justifyContent:"center"}}>
               <button onClick={()=>setDupeWarning(null)} style={{padding:"12px 20px",background:"none",border:"1px solid rgba(255,255,255,0.15)",color:"#889",borderRadius:6,cursor:"pointer",minHeight:48}}>Cancel</button>
-              <button onClick={()=>{const next=[...vendors,{...dupeWarning,id:Date.now()}];setVendors(next);persist(next,departments,conferences,weights,mustHaves);setShowForm(false);setDupeWarning(null);}}
+              <button onClick={()=>{const next=[...vendors,{...dupeWarning,id:Date.now()}];setVendors(next);persistVendors(next);setShowForm(false);setDupeWarning(null);}}
                 style={{padding:"12px 20px",background:"#ffd93d",border:"none",color:"#000",borderRadius:6,cursor:"pointer",fontWeight:700,minHeight:48}}>Save Anyway</button>
             </div>
           </div>
