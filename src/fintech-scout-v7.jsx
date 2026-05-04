@@ -1,0 +1,1337 @@
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { createClient } from "@supabase/supabase-js";
+
+// ─── Supabase ─────────────────────────────────────────────────────────────────
+const SUPABASE_URL = "https://yjtmdotjhjjysovjhckr.supabase.co";
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_KEY;
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const DEFAULT_WEIGHTS = {
+  internationalSupport: 25,
+  ncuaCompliance: 15,
+  scalability: 15,
+  fiserDNA: 15,
+  alkami: 10,
+  meridianLink: 10,
+  departmentFit: 10,
+};
+
+const WEIGHT_LABELS = {
+  internationalSupport: "International Support",
+  ncuaCompliance: "NCUA Compliance",
+  scalability: "Scalability",
+  fiserDNA: "FISERV DNA Integration",
+  alkami: "Alkami Integration",
+  meridianLink: "MeridianLink Integration",
+  departmentFit: "Department Fit",
+};
+
+const DEFAULT_MUST_HAVES = { ncuaCompliance: 3, fiserDNA: 3 };
+
+// Dynamic labels — mirrors DEFAULT_WEIGHTS keys, user can rename/add/delete
+const DEFAULT_WEIGHT_LABELS = { ...WEIGHT_LABELS };
+
+const DEFAULT_DEPARTMENTS = [
+  "Deposit Operations","Marketing","Risk Management",
+  "Consumer Lending","Mortgage Lending","Communication Center",
+];
+
+const DEFAULT_CONFERENCES = [
+  "CUNA GAC 2025","Finovate Spring 2025",
+  "NAFCU Annual Conference 2025","Money20/20 USA 2025","Other",
+];
+
+const NEXT_STEPS = [
+  "Schedule Demo","Request Proposal","Follow-up Call",
+  "Connect on LinkedIn","Pass / No Fit","Further Research",
+];
+
+const PIPELINE_STAGES = ["Identified","Demo Scheduled","Proposal","Decision","Onboarded","Passed"];
+const STAGE_COLORS = {
+  Identified:"#4488aa","Demo Scheduled":"#4db8ff",Proposal:"#ffd93d",
+  Decision:"#ff9f43",Onboarded:"#2ecc71",Passed:"#e74c3c",
+};
+
+const GRADES = [
+  {min:4.5,grade:"A+",color:"#00d4aa"},{min:4.0,grade:"A",color:"#00d4aa"},
+  {min:3.5,grade:"B+",color:"#6bcb77"},{min:3.0,grade:"B",color:"#6bcb77"},
+  {min:2.5,grade:"C+",color:"#ffd93d"},{min:2.0,grade:"C",color:"#ffd93d"},
+  {min:1.5,grade:"D",color:"#ff9f43"},{min:0,grade:"F",color:"#e74c3c"},
+];
+
+const EMPTY_FORM = {
+  id:null,fintechName:"",departmentFocus:[],conference:"",conferenceDate:"",
+  internationalSupport:3,ncuaCompliance:3,scalability:3,fiserDNA:3,
+  alkami:3,meridianLink:3,departmentFit:3,implementationEffort:3,
+  cusUsing:"",cuAssetSize:"",referenceContact:"",
+  strategicPriority:"Medium",nextStep:"Schedule Demo",
+  pipelineStage:"Identified",notes:"",noteHistory:[],
+};
+
+// Supabase is the source of truth
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function calcWeighted(f, weights) {
+  const total = Object.values(weights).reduce((s,w)=>s+w,0)||100;
+  return Object.keys(weights).reduce((s,k)=>s+(f[k]||0)*(weights[k]/total),0);
+}
+function calcEffortAdjusted(w,effort) { return w*([0,1.0,0.95,0.85,0.70,0.55][effort]??1); }
+function meetsMustHaves(f,mustHaves) { return Object.entries(mustHaves).every(([k,v])=>(f[k]||0)>=v); }
+function getGrade(score) { return GRADES.find(g=>score>=g.min)||GRADES[GRADES.length-1]; }
+
+function exportCSV(vendors, weights) {
+  const headers = ["Name","Departments","Conference","Date","Int'l","NCUA","Scale","DNA","Alkami","MeridianLink","DeptFit","Effort","Weighted","EffortAdj","Grade","MustHaves","Priority","Stage","NextStep","CUsUsing","AssetSize","Reference","Notes"];
+  const rows = vendors.map(v=>[
+    v.fintechName,(v.departmentFocus||[]).join("|"),v.conference,v.conferenceDate,
+    v.internationalSupport,v.ncuaCompliance,v.scalability,v.fiserDNA,
+    v.alkami,v.meridianLink,v.departmentFit,v.implementationEffort,
+    v.weighted?.toFixed(2),v.effortAdj?.toFixed(2),getGrade(v.effortAdj||0).grade,
+    v.mustHave?"Pass":"Fail",v.strategicPriority,v.pipelineStage,
+    v.nextStep,v.cusUsing,v.cuAssetSize,v.referenceContact,
+    `"${(v.notes||"").replace(/"/g,'""')}"`
+  ]);
+  const csv=[headers,...rows].map(r=>r.join(",")).join("\n");
+  const blob=new Blob([csv],{type:"text/csv"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");a.href=url;a.download="fintech-scout-export.csv";a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportJSON(state) {
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");a.href=url;a.download=`fintech-scout-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const css = {
+  card:{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:10,padding:20},
+  input:{width:"100%",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:6,padding:"8px 12px",color:"#fff",fontSize:14,boxSizing:"border-box",fontFamily:"inherit"},
+  selectDark:{background:"#0f1923",border:"1px solid rgba(255,255,255,0.12)",borderRadius:6,padding:"8px 12px",color:"#fff",fontSize:14},
+  label:{fontSize:11,color:"#8899aa",letterSpacing:"0.08em",textTransform:"uppercase",display:"block",marginBottom:4},
+};
+
+// ─── UI Primitives ────────────────────────────────────────────────────────────
+
+function ScoreBar({value,max=5,color="#00d4aa"}) {
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:6}}>
+      <div style={{flex:1,height:6,background:"rgba(255,255,255,0.08)",borderRadius:3,overflow:"hidden"}}>
+        <div style={{width:`${Math.min((value/max)*100,100)}%`,height:"100%",background:color,borderRadius:3,transition:"width 0.4s ease"}}/>
+      </div>
+      <span style={{fontSize:11,color:"#aaa",minWidth:24,textAlign:"right"}}>{typeof value==="number"?value.toFixed(1):value}</span>
+    </div>
+  );
+}
+
+function RatingInput({label,value,onChange,hint,highlight}) {
+  return (
+    <div style={{marginBottom:14}}>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+        <label style={{...css.label,color:highlight?"#ffd93d":"#8899aa"}}>{label}</label>
+        <span style={{fontSize:13,color:"#00d4aa",fontWeight:700}}>{value}</span>
+      </div>
+      {hint&&<div style={{fontSize:10,color:"#556",marginBottom:4}}>{hint}</div>}
+      <div style={{display:"flex",gap:6}}>
+        {[1,2,3,4,5].map(n=>(
+          <button key={n} onClick={()=>onChange(n)} style={{
+            flex:1,padding:"10px 0",border:"1px solid",
+            borderColor:value===n?"#00d4aa":"rgba(255,255,255,0.1)",
+            background:value===n?"rgba(0,212,170,0.15)":"rgba(255,255,255,0.03)",
+            color:value===n?"#00d4aa":"#667",
+            borderRadius:6,fontSize:16,cursor:"pointer",fontWeight:value===n?700:400,transition:"all 0.15s",
+            minHeight:44,touchAction:"manipulation",
+          }}>{n}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Modal({children,onClose,wide}) {
+  useEffect(()=>{
+    const old=document.body.style.overflow;
+    document.body.style.overflow="hidden";
+    return()=>{document.body.style.overflow=old;};
+  },[]);
+  return (
+    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:"0"}}>
+      <div onClick={e=>e.stopPropagation()} style={{
+        background:"#0a1520",border:"1px solid rgba(0,212,170,0.2)",
+        borderRadius:"16px 16px 0 0",
+        width:"100%",maxWidth:wide?920:700,maxHeight:"92vh",overflowY:"auto",
+        padding:"24px 24px 40px",
+      }}>
+        <div style={{width:40,height:4,background:"rgba(255,255,255,0.15)",borderRadius:2,margin:"0 auto 20px"}}/>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function CreatableSelect({value,onChange,options,placeholder,onAddOption}) {
+  const [typing,setTyping]=useState(false);
+  const [inputVal,setInputVal]=useState("");
+  if(typing) return (
+    <div style={{display:"flex",gap:6}}>
+      <input autoFocus value={inputVal} onChange={e=>setInputVal(e.target.value)}
+        onKeyDown={e=>{
+          if(e.key==="Enter"&&inputVal.trim()){const v=inputVal.trim();onAddOption(v);onChange(v);setTyping(false);setInputVal("");}
+          if(e.key==="Escape"){setTyping(false);setInputVal("");}
+        }}
+        placeholder="Type new name, Enter to add..."
+        style={{...css.input,flex:1,border:"1px solid rgba(0,212,170,0.4)"}}/>
+      <button onClick={()=>{if(inputVal.trim()){onAddOption(inputVal.trim());onChange(inputVal.trim());}setTyping(false);setInputVal("");}}
+        style={{padding:"8px 12px",background:"#00d4aa",border:"none",borderRadius:6,color:"#000",fontWeight:700,cursor:"pointer",fontSize:13,whiteSpace:"nowrap",minHeight:44}}>Add</button>
+      <button onClick={()=>{setTyping(false);setInputVal("");}}
+        style={{padding:"8px 10px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:6,color:"#889",cursor:"pointer",minHeight:44}}>✕</button>
+    </div>
+  );
+  return (
+    <div style={{display:"flex",gap:6}}>
+      <select value={value} onChange={e=>onChange(e.target.value)} style={{...css.selectDark,flex:1,color:value?"#fff":"#556",minHeight:44}}>
+        <option value="">{placeholder}</option>
+        {options.map(o=><option key={o}>{o}</option>)}
+      </select>
+      <button onClick={()=>setTyping(true)} style={{padding:"8px 13px",background:"rgba(0,212,170,0.1)",border:"1px solid rgba(0,212,170,0.25)",borderRadius:6,color:"#00d4aa",cursor:"pointer",fontSize:20,lineHeight:1,minHeight:44,minWidth:44}}>+</button>
+    </div>
+  );
+}
+
+function MultiSelect({values=[],onChange,options,placeholder,onAddOption}) {
+  const [typing,setTyping]=useState(false);
+  const [inputVal,setInputVal]=useState("");
+  const toggle=opt=>onChange(values.includes(opt)?values.filter(v=>v!==opt):[...values,opt]);
+  return (
+    <div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8,minHeight:28}}>
+        {values.map(v=>(
+          <span key={v} style={{display:"inline-flex",alignItems:"center",gap:4,padding:"4px 10px",background:"rgba(0,212,170,0.15)",border:"1px solid rgba(0,212,170,0.3)",borderRadius:12,fontSize:13,color:"#00d4aa"}}>
+            {v}
+            <button onClick={()=>toggle(v)} style={{background:"none",border:"none",color:"#00d4aa",cursor:"pointer",fontSize:16,lineHeight:1,padding:0,minWidth:20,minHeight:20}}>×</button>
+          </span>
+        ))}
+        {values.length===0&&<span style={{fontSize:13,color:"#445"}}>{placeholder}</span>}
+      </div>
+      {typing&&(
+        <div style={{display:"flex",gap:6,marginBottom:8}}>
+          <input autoFocus value={inputVal} onChange={e=>setInputVal(e.target.value)}
+            onKeyDown={e=>{
+              if(e.key==="Enter"&&inputVal.trim()){const v=inputVal.trim();onAddOption(v);toggle(v);setTyping(false);setInputVal("");}
+              if(e.key==="Escape"){setTyping(false);setInputVal("");}
+            }}
+            placeholder="New department..." style={{...css.input,flex:1,border:"1px solid rgba(0,212,170,0.4)"}}/>
+          <button onClick={()=>{if(inputVal.trim()){onAddOption(inputVal.trim());toggle(inputVal.trim());}setTyping(false);setInputVal("");}}
+            style={{padding:"8px 12px",background:"#00d4aa",border:"none",borderRadius:6,color:"#000",fontWeight:700,cursor:"pointer",fontSize:13,minHeight:44}}>Add</button>
+          <button onClick={()=>{setTyping(false);setInputVal("");}} style={{padding:"8px 10px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:6,color:"#889",cursor:"pointer",minHeight:44}}>✕</button>
+        </div>
+      )}
+      <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+        {options.map(opt=>(
+          <button key={opt} onClick={()=>toggle(opt)} style={{
+            padding:"8px 14px",border:"1px solid",fontSize:13,borderRadius:12,cursor:"pointer",transition:"all 0.15s",
+            borderColor:values.includes(opt)?"rgba(0,212,170,0.4)":"rgba(255,255,255,0.1)",
+            background:values.includes(opt)?"rgba(0,212,170,0.1)":"rgba(255,255,255,0.03)",
+            color:values.includes(opt)?"#00d4aa":"#667",minHeight:40,touchAction:"manipulation",
+          }}>{opt}</button>
+        ))}
+        <button onClick={()=>setTyping(!typing)} style={{padding:"8px 14px",border:"1px dashed rgba(0,212,170,0.3)",fontSize:13,borderRadius:12,cursor:"pointer",background:"none",color:"#00d4aa",minHeight:40}}>+ New</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Swipe Card (Mobile Quick Triage) ────────────────────────────────────────
+
+function SwipeCard({vendor,onPass,onProceed,onEdit}) {
+  const [drag,setDrag]=useState(0);
+  const startX=useRef(0);
+  const isDragging=useRef(false);
+  const THRESHOLD=80;
+  const grade=getGrade(vendor.effortAdj||0);
+
+  const handleStart=e=>{startX.current=e.touches?.[0]?.clientX??e.clientX;isDragging.current=true;};
+  const handleMove=e=>{if(!isDragging.current)return;const x=(e.touches?.[0]?.clientX??e.clientX)-startX.current;setDrag(x);};
+  const handleEnd=()=>{
+    if(drag>THRESHOLD)onProceed(vendor);
+    else if(drag<-THRESHOLD)onPass(vendor);
+    setDrag(0);isDragging.current=false;
+  };
+
+  const bg=drag>40?"rgba(0,212,170,0.15)":drag<-40?"rgba(231,76,60,0.15)":"rgba(255,255,255,0.03)";
+  const rotation=drag*0.05;
+
+  return (
+    <div
+      onMouseDown={handleStart} onMouseMove={handleMove} onMouseUp={handleEnd} onMouseLeave={handleEnd}
+      onTouchStart={handleStart} onTouchMove={handleMove} onTouchEnd={handleEnd}
+      style={{
+        position:"relative",padding:20,borderRadius:16,border:"1px solid rgba(255,255,255,0.1)",
+        background:bg,transform:`translateX(${drag}px) rotate(${rotation}deg)`,
+        transition:drag===0?"transform 0.3s ease":"none",cursor:"grab",userSelect:"none",
+        touchAction:"pan-y",marginBottom:12,
+      }}>
+      {drag>40&&<div style={{position:"absolute",top:16,right:20,fontSize:22,color:"#00d4aa",fontWeight:700,opacity:Math.min(drag/80,1)}}>✓ PROCEED</div>}
+      {drag<-40&&<div style={{position:"absolute",top:16,left:20,fontSize:22,color:"#e74c3c",fontWeight:700,opacity:Math.min(-drag/80,1)}}>✗ PASS</div>}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+        <div style={{flex:1}}>
+          <div style={{fontSize:18,fontWeight:700,color:"#fff",marginBottom:4}}>{vendor.fintechName}</div>
+          <div style={{fontSize:13,color:"#556",marginBottom:8}}>{(vendor.departmentFocus||[]).join(", ")}</div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <span style={{fontSize:12,color:vendor.mustHave?"#2ecc71":"#e74c3c"}}>{vendor.mustHave?"✓ Must-Haves":"✗ Must-Haves"}</span>
+            <span style={{fontSize:12,color:STAGE_COLORS[vendor.pipelineStage||"Identified"]}}>{vendor.pipelineStage||"Identified"}</span>
+          </div>
+        </div>
+        <div style={{textAlign:"center",marginLeft:16}}>
+          <div style={{fontSize:28,fontWeight:700,color:"#00d4aa"}}>{(vendor.effortAdj||0).toFixed(1)}</div>
+          <div style={{padding:"2px 10px",borderRadius:6,background:`${grade.color}22`,color:grade.color,fontSize:14,fontWeight:700}}>{grade.grade}</div>
+        </div>
+      </div>
+      <div style={{display:"flex",gap:6,marginTop:14}}>
+        {[["DNA",vendor.fiserDNA],["NCUA",vendor.ncuaCompliance],["Alkami",vendor.alkami],["Merit.",vendor.meridianLink],["Intl",vendor.internationalSupport],["Dept",vendor.departmentFit]].map(([lbl,val])=>(
+          <div key={lbl} style={{flex:1,textAlign:"center",background:"rgba(255,255,255,0.04)",borderRadius:6,padding:"4px 0"}}>
+            <div style={{fontSize:13,fontWeight:700,color:val>=4?"#00d4aa":val>=3?"#ffd93d":"#e74c3c"}}>{val}</div>
+            <div style={{fontSize:9,color:"#334"}}>{lbl}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{display:"flex",gap:8,marginTop:14,justifyContent:"center"}}>
+        <button onClick={()=>onPass(vendor)} style={{flex:1,padding:"10px",background:"rgba(231,76,60,0.1)",border:"1px solid rgba(231,76,60,0.3)",borderRadius:10,color:"#e74c3c",fontSize:14,cursor:"pointer",fontWeight:600,minHeight:44}}>✗ Pass</button>
+        <button onClick={()=>onEdit(vendor)} style={{padding:"10px 16px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,color:"#889",fontSize:13,cursor:"pointer",minHeight:44}}>Edit</button>
+        <button onClick={()=>onProceed(vendor)} style={{flex:1,padding:"10px",background:"rgba(0,212,170,0.1)",border:"1px solid rgba(0,212,170,0.3)",borderRadius:10,color:"#00d4aa",fontSize:14,cursor:"pointer",fontWeight:600,minHeight:44}}>✓ Proceed</button>
+      </div>
+      <div style={{textAlign:"center",marginTop:10,fontSize:11,color:"#334"}}>← swipe to pass · swipe to proceed →</div>
+    </div>
+  );
+}
+
+// ─── Comparison View ──────────────────────────────────────────────────────────
+
+function CompareView({vendors,weights,mustHaves,onClose}) {
+  const [selected,setSelected]=useState([]);
+  const toggle=v=>setSelected(s=>s.find(x=>x.id===v.id)?s.filter(x=>x.id!==v.id):s.length<3?[...s,v]:s);
+  const FIELDS=[
+    {key:"effortAdj",label:"Effort-Adj Score",fmt:v=>v.toFixed(2),color:v=>getGrade(v).color},
+    {key:"weighted",label:"Weighted Score",fmt:v=>v.toFixed(2),color:()=>"#4db8ff"},
+    {key:"internationalSupport",label:"Int'l Support",fmt:v=>v,color:v=>v>=4?"#00d4aa":v>=3?"#ffd93d":"#e74c3c"},
+    {key:"ncuaCompliance",label:"NCUA Compliance",fmt:v=>v,color:v=>v>=4?"#00d4aa":v>=3?"#ffd93d":"#e74c3c"},
+    {key:"scalability",label:"Scalability",fmt:v=>v,color:v=>v>=4?"#00d4aa":v>=3?"#ffd93d":"#e74c3c"},
+    {key:"fiserDNA",label:"FISERV DNA",fmt:v=>v,color:v=>v>=4?"#00d4aa":v>=3?"#ffd93d":"#e74c3c"},
+    {key:"alkami",label:"Alkami",fmt:v=>v,color:v=>v>=4?"#00d4aa":v>=3?"#ffd93d":"#e74c3c"},
+    {key:"meridianLink",label:"MeridianLink",fmt:v=>v,color:v=>v>=4?"#00d4aa":v>=3?"#ffd93d":"#e74c3c"},
+    {key:"departmentFit",label:"Department Fit",fmt:v=>v,color:v=>v>=4?"#00d4aa":v>=3?"#ffd93d":"#e74c3c"},
+    {key:"implementationEffort",label:"Impl. Effort",fmt:v=>v,color:v=>v<=2?"#00d4aa":v<=3?"#ffd93d":"#e74c3c"},
+    {key:"mustHave",label:"Must-Haves",fmt:v=>v?"✓ Pass":"✗ Fail",color:v=>v?"#2ecc71":"#e74c3c"},
+  ];
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <h2 style={{color:"#fff",fontFamily:"Georgia,serif",margin:0}}>Side-by-Side Comparison</h2>
+        <button onClick={onClose} style={{background:"none",border:"none",color:"#556",fontSize:22,cursor:"pointer"}}>✕</button>
+      </div>
+      <p style={{color:"#556",fontSize:13,marginBottom:16}}>Select up to 3 vendors to compare head-to-head.</p>
+      <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:24}}>
+        {vendors.map(v=>(
+          <button key={v.id} onClick={()=>toggle(v)} style={{
+            padding:"6px 14px",borderRadius:20,fontSize:13,cursor:"pointer",border:"1px solid",
+            borderColor:selected.find(x=>x.id===v.id)?"#00d4aa":"rgba(255,255,255,0.12)",
+            background:selected.find(x=>x.id===v.id)?"rgba(0,212,170,0.15)":"rgba(255,255,255,0.03)",
+            color:selected.find(x=>x.id===v.id)?"#00d4aa":"#889",transition:"all 0.15s",
+          }}>{v.fintechName}</button>
+        ))}
+      </div>
+      {selected.length>=2?(
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",minWidth:400}}>
+            <thead>
+              <tr>
+                <th style={{textAlign:"left",padding:"10px 12px",fontSize:11,color:"#446",textTransform:"uppercase",borderBottom:"1px solid rgba(255,255,255,0.08)"}}>Criteria</th>
+                {selected.map(v=>(
+                  <th key={v.id} style={{textAlign:"center",padding:"10px 12px",fontSize:14,color:"#fff",fontWeight:700,borderBottom:"1px solid rgba(255,255,255,0.08)"}}>
+                    {v.fintechName}
+                    <div style={{fontSize:11,color:"#556",fontWeight:400,marginTop:2}}>{(v.departmentFocus||[]).slice(0,1).join(", ")}</div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {FIELDS.map(f=>{
+                const vals=selected.map(v=>f.key==="effortAdj"?v.effortAdj||0:f.key==="weighted"?v.weighted||0:f.key==="mustHave"?v.mustHave:v[f.key]||0);
+                const best=f.key==="implementationEffort"?Math.min(...vals.filter(v=>typeof v==="number")):Math.max(...vals.filter(v=>typeof v==="number"));
+                return (
+                  <tr key={f.key} style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                    <td style={{padding:"10px 12px",fontSize:13,color:"#8899aa"}}>{f.label}</td>
+                    {selected.map((v,i)=>{
+                      const val=vals[i];
+                      const isBest=typeof val==="number"?val===best:false;
+                      return (
+                        <td key={v.id} style={{textAlign:"center",padding:"10px 12px"}}>
+                          <span style={{
+                            fontSize:15,fontWeight:700,color:f.color(val),
+                            background:isBest?"rgba(0,212,170,0.1)":"transparent",
+                            padding:"2px 8px",borderRadius:6,
+                          }}>{f.fmt(val)}</span>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ):(
+        <div style={{textAlign:"center",padding:40,color:"#334"}}>
+          <div style={{fontSize:32,marginBottom:8}}>⚖️</div>
+          <div style={{fontSize:14,color:"#556"}}>Select at least 2 vendors above to compare</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Weights + Must-Have Editor (fully editable) ─────────────────────────────
+
+function WeightsEditor({weights,weightLabels,onChange,onLabelsChange,mustHaves,onMustHavesChange}) {
+  const [newFieldName,setNewFieldName]=useState("");
+  const [editingLabel,setEditingLabel]=useState(null); // key being renamed
+  const [editingLabelVal,setEditingLabelVal]=useState("");
+
+  const total=Object.values(weights).reduce((s,w)=>s+Number(w),0);
+  const keys=Object.keys(weights);
+
+  const setW=(k,v)=>onChange({...weights,[k]:Math.max(0,Math.min(100,Number(v)||0))});
+
+  const addField=()=>{
+    const name=newFieldName.trim();
+    if(!name)return;
+    // create a safe key from the name
+    const key="custom_"+name.toLowerCase().replace(/[^a-z0-9]/g,"_")+"_"+Date.now();
+    onChange({...weights,[key]:0});
+    onLabelsChange({...weightLabels,[key]:name});
+    onMustHavesChange({...mustHaves,[key]:1});
+    setNewFieldName("");
+  };
+
+  const deleteField=k=>{
+    const w={...weights};const l={...weightLabels};const m={...mustHaves};
+    delete w[k];delete l[k];delete m[k];
+    onChange(w);onLabelsChange(l);onMustHavesChange(m);
+  };
+
+  const startRename=(k)=>{setEditingLabel(k);setEditingLabelVal(weightLabels[k]||k);};
+  const commitRename=(k)=>{
+    if(editingLabelVal.trim()) onLabelsChange({...weightLabels,[k]:editingLabelVal.trim()});
+    setEditingLabel(null);
+  };
+
+  return (
+    <div style={{maxWidth:720}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+        <h2 style={{color:"#fff",fontFamily:"Georgia,serif",margin:0}}>Scoring Weights & Must-Haves</h2>
+        <div style={{fontSize:13,color:Math.abs(total-100)<1?"#2ecc71":"#e74c3c",fontWeight:700}}>
+          Total: {total}% {Math.abs(total-100)>=1&&"⚠ Must = 100%"}
+        </div>
+      </div>
+      <p style={{color:"#556",fontSize:13,marginBottom:20}}>Edit field names, adjust weights, set must-have minimums, or add/remove criteria. Weights must total 100%.</p>
+
+      {/* Column Headers */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 90px 80px 80px 36px",gap:8,marginBottom:8,padding:"0 4px"}}>
+        {["Criteria Name","Weight %","Slider","Must-Have Min",""].map(h=>(
+          <div key={h} style={{fontSize:10,color:"#445",textTransform:"uppercase",letterSpacing:"0.08em"}}>{h}</div>
+        ))}
+      </div>
+
+      {/* Rows */}
+      {keys.map(k=>(
+        <div key={k} style={{display:"grid",gridTemplateColumns:"1fr 90px 80px 80px 36px",gap:8,alignItems:"center",marginBottom:12,padding:"10px 10px",background:"rgba(255,255,255,0.03)",borderRadius:8,border:"1px solid rgba(255,255,255,0.06)"}}>
+          {/* Label */}
+          <div>
+            {editingLabel===k?(
+              <input autoFocus value={editingLabelVal} onChange={e=>setEditingLabelVal(e.target.value)}
+                onBlur={()=>commitRename(k)} onKeyDown={e=>{if(e.key==="Enter")commitRename(k);if(e.key==="Escape")setEditingLabel(null);}}
+                style={{...css.input,fontSize:13,padding:"4px 8px",border:"1px solid rgba(0,212,170,0.4)"}}/>
+            ):(
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <span style={{fontSize:13,color:"#c8d8e8"}}>{weightLabels[k]||k}</span>
+                <button onClick={()=>startRename(k)} title="Rename" style={{background:"none",border:"none",color:"#445",cursor:"pointer",fontSize:12,padding:"2px 4px",lineHeight:1}}>✎</button>
+              </div>
+            )}
+          </div>
+
+          {/* Weight number input */}
+          <div style={{display:"flex",alignItems:"center",gap:4}}>
+            <input type="number" min="0" max="100" value={weights[k]} onChange={e=>setW(k,e.target.value)}
+              style={{width:52,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:4,padding:"4px 6px",color:"#00d4aa",fontSize:13,fontWeight:700,textAlign:"center"}}/>
+            <span style={{fontSize:11,color:"#445"}}>%</span>
+          </div>
+
+          {/* Slider */}
+          <input type="range" min="0" max="50" value={weights[k]} onChange={e=>setW(k,e.target.value)}
+            style={{width:"100%",accentColor:"#00d4aa",cursor:"pointer"}}/>
+
+          {/* Must-Have Min */}
+          <select value={mustHaves[k]||1} onChange={e=>onMustHavesChange({...mustHaves,[k]:Number(e.target.value)})}
+            style={{...css.selectDark,padding:"4px 6px",fontSize:13,color:mustHaves[k]>1?"#ffd93d":"#445",width:"100%"}}>
+            <option value={1}>Off</option>
+            {[2,3,4,5].map(n=><option key={n} value={n}>≥{n}</option>)}
+          </select>
+
+          {/* Delete */}
+          <button onClick={()=>deleteField(k)} title="Remove criteria"
+            style={{background:"rgba(231,76,60,0.1)",border:"1px solid rgba(231,76,60,0.2)",borderRadius:6,color:"#e74c3c",cursor:"pointer",fontSize:14,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
+        </div>
+      ))}
+
+      {/* Total bar */}
+      <div style={{padding:12,background:Math.abs(total-100)<1?"rgba(0,212,170,0.05)":"rgba(231,76,60,0.05)",border:`1px solid ${Math.abs(total-100)<1?"rgba(0,212,170,0.2)":"rgba(231,76,60,0.2)"}`,borderRadius:8,marginBottom:20}}>
+        <div style={{fontSize:13,color:Math.abs(total-100)<1?"#00d4aa":"#e74c3c",fontWeight:600}}>
+          {Math.abs(total-100)<1?"✓ Weights balanced at 100%":`⚠ Total is ${total}% — adjust to reach exactly 100%`}
+        </div>
+      </div>
+
+      {/* Add new field */}
+      <div style={{padding:16,background:"rgba(0,212,170,0.04)",border:"1px dashed rgba(0,212,170,0.2)",borderRadius:10}}>
+        <div style={{fontSize:12,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Add New Scoring Criteria</div>
+        <div style={{display:"flex",gap:8}}>
+          <input value={newFieldName} onChange={e=>setNewFieldName(e.target.value)}
+            onKeyDown={e=>{if(e.key==="Enter")addField();}}
+            placeholder="e.g. API Documentation Quality"
+            style={{...css.input,flex:1,border:"1px solid rgba(0,212,170,0.3)"}}/>
+          <button onClick={addField} style={{padding:"8px 18px",background:"#00d4aa",border:"none",borderRadius:6,color:"#000",fontWeight:700,cursor:"pointer",fontSize:14,whiteSpace:"nowrap",minHeight:44}}>+ Add</button>
+        </div>
+        <div style={{fontSize:11,color:"#334",marginTop:6}}>New criteria start at 0% weight and no must-have. Adjust above after adding.</div>
+      </div>
+
+      <div style={{marginTop:16,padding:12,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:8}}>
+        <div style={{fontSize:11,color:"#445"}}>💡 <strong style={{color:"#889"}}>Must-Have Min:</strong> Off = not required. ≥2–5 = vendor must score at least that value to pass the must-haves gate. The ✗ flag appears on any vendor that fails.</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Entry Form ───────────────────────────────────────────────────────────────
+
+function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartment,onAddConference,weights,weightLabels,mustHaves,quickMode=false}) {
+  const [form,setForm]=useState(initial||EMPTY_FORM);
+  const [tab,setTab]=useState("basic");
+  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+  const weighted=calcWeighted(form,weights);
+  const effortAdj=calcEffortAdjusted(weighted,form.implementationEffort);
+  const mustHave=meetsMustHaves(form,mustHaves);
+  const grade=getGrade(effortAdj);
+  const tabs=quickMode?["basic","scores"]:["basic","scores","reference","notes"];
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <h2 style={{color:"#fff",fontSize:20,margin:0,fontFamily:"Georgia,serif"}}>{form.id?"Edit Fintech":quickMode?"⚡ Quick Entry":"Log New Fintech"}</h2>
+        <button onClick={onClose} style={{background:"none",border:"none",color:"#556",fontSize:24,cursor:"pointer",minWidth:44,minHeight:44}}>✕</button>
+      </div>
+
+      {/* Live Score */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:20,padding:14,background:"rgba(0,212,170,0.05)",borderRadius:8,border:"1px solid rgba(0,212,170,0.15)"}}>
+        {[
+          {label:"Weighted",value:weighted.toFixed(2),color:"#00d4aa"},
+          {label:"Eff. Adj",value:effortAdj.toFixed(2),color:"#4db8ff"},
+          {label:"Grade",value:grade.grade,color:grade.color},
+          {label:"Must-Haves",value:mustHave?"✓ PASS":"✗ FAIL",color:mustHave?"#2ecc71":"#e74c3c"},
+        ].map(({label,value,color})=>(
+          <div key={label} style={{textAlign:"center"}}>
+            <div style={{fontSize:20,fontWeight:700,color}}>{value}</div>
+            <div style={{fontSize:10,color:"#556",textTransform:"uppercase",letterSpacing:"0.08em"}}>{label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Tabs */}
+      <div style={{display:"flex",gap:4,marginBottom:20,borderBottom:"1px solid rgba(255,255,255,0.06)",paddingBottom:12,overflowX:"auto"}}>
+        {tabs.map(t=>(
+          <button key={t} onClick={()=>setTab(t)} style={{
+            padding:"8px 16px",border:"none",borderRadius:8,
+            background:tab===t?"rgba(0,212,170,0.15)":"none",
+            color:tab===t?"#00d4aa":"#556",cursor:"pointer",fontSize:14,fontWeight:tab===t?600:400,
+            textTransform:"capitalize",whiteSpace:"nowrap",minHeight:40,
+          }}>{t}</button>
+        ))}
+      </div>
+
+      {tab==="basic"&&(
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+          <div style={{gridColumn:"1/-1"}}>
+            <label style={css.label}>Fintech Name *</label>
+            <input value={form.fintechName} onChange={e=>set("fintechName",e.target.value)} placeholder="e.g. Zest AI" style={{...css.input,fontSize:16,padding:"12px"}}/>
+          </div>
+          <div style={{gridColumn:"1/-1"}}>
+            <label style={css.label}>Department Focus * (select multiple)</label>
+            <MultiSelect values={form.departmentFocus||[]} onChange={v=>set("departmentFocus",v)} options={departments} placeholder="Select departments..." onAddOption={onAddDepartment}/>
+          </div>
+          <div>
+            <label style={css.label}>Strategic Priority</label>
+            <select value={form.strategicPriority} onChange={e=>set("strategicPriority",e.target.value)} style={{...css.selectDark,width:"100%",minHeight:44}}>
+              {["High","Medium","Low"].map(p=><option key={p}>{p}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={css.label}>Pipeline Stage</label>
+            <select value={form.pipelineStage||"Identified"} onChange={e=>set("pipelineStage",e.target.value)} style={{...css.selectDark,width:"100%",minHeight:44}}>
+              {PIPELINE_STAGES.map(s=><option key={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={css.label}>Conference / Event</label>
+            <CreatableSelect value={form.conference} onChange={v=>set("conference",v)} options={conferences} placeholder="Select Conference" onAddOption={onAddConference}/>
+          </div>
+          <div>
+            <label style={css.label}>Conference Date</label>
+            <input type="date" value={form.conferenceDate} onChange={e=>set("conferenceDate",e.target.value)} style={{...css.input,colorScheme:"dark",minHeight:44}}/>
+          </div>
+        </div>
+      )}
+
+      {tab==="scores"&&(
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 24px"}}>
+          {Object.keys(weights).map(k=>(
+            <RatingInput key={k} label={`${(weightLabels||{})[k]||k} (${weights[k]}%)`}
+              value={form[k]||3} onChange={v=>set(k,v)}
+              highlight={mustHaves[k]>1}
+              hint={mustHaves[k]>1?`Must-Have: ≥${mustHaves[k]} required`:null}/>
+          ))}
+          <RatingInput label="Implementation Effort (1=Easy, 5=Hard)" value={form.implementationEffort} onChange={v=>set("implementationEffort",v)} hint="Higher effort penalizes adjusted score"/>
+        </div>
+      )}
+
+      {tab==="reference"&&(
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+          {[
+            {k:"cusUsing",label:"CUs Using It",ph:"e.g. 3 CUs"},
+            {k:"cuAssetSize",label:"CU Asset Size",ph:"e.g. $500M–$2B"},
+            {k:"referenceContact",label:"Reference Contact",ph:"Name / email"},
+          ].map(({k,label,ph})=>(
+            <div key={k}>
+              <label style={css.label}>{label}</label>
+              <input value={form[k]||""} onChange={e=>set(k,e.target.value)} placeholder={ph} style={{...css.input,minHeight:44}}/>
+            </div>
+          ))}
+          <div>
+            <label style={css.label}>Next Step</label>
+            <select value={form.nextStep} onChange={e=>set("nextStep",e.target.value)} style={{...css.selectDark,width:"100%",minHeight:44}}>
+              {NEXT_STEPS.map(s=><option key={s}>{s}</option>)}
+            </select>
+          </div>
+        </div>
+      )}
+
+      {tab==="notes"&&(
+        <div>
+          <label style={css.label}>Add Note</label>
+          <textarea value={form.notes} onChange={e=>set("notes",e.target.value)} rows={4}
+            placeholder="Key differentiators, concerns, booth conversation notes..."
+            style={{...css.input,resize:"vertical",fontSize:15}}/>
+          {(form.noteHistory||[]).length>0&&(
+            <div style={{marginTop:16}}>
+              <div style={{fontSize:11,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Note History</div>
+              {[...form.noteHistory].reverse().map((n,i)=>(
+                <div key={i} style={{padding:"10px 14px",background:"rgba(255,255,255,0.03)",borderRadius:8,marginBottom:8,borderLeft:"3px solid rgba(0,212,170,0.3)"}}>
+                  <div style={{fontSize:10,color:"#445",marginBottom:4}}>{new Date(n.ts).toLocaleString()}</div>
+                  <div style={{fontSize:13,color:"#aabbcc"}}>{n.text}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:24,paddingTop:16,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+        <button onClick={onClose} style={{padding:"12px 20px",background:"none",border:"1px solid rgba(255,255,255,0.15)",color:"#889",borderRadius:8,cursor:"pointer",fontSize:15,minHeight:48}}>Cancel</button>
+        <button onClick={()=>{
+          if(!form.fintechName||(form.departmentFocus||[]).length===0)return;
+          const noteHistory=form.notes&&form.notes!==initial?.notes
+            ?[...(form.noteHistory||[]),{text:form.notes,ts:Date.now()}]
+            :(form.noteHistory||[]);
+          onSave({...form,id:form.id||Date.now(),noteHistory});
+        }} style={{
+          padding:"12px 24px",minHeight:48,
+          background:form.fintechName&&(form.departmentFocus||[]).length>0?"#00d4aa":"#223",
+          border:"none",color:form.fintechName&&(form.departmentFocus||[]).length>0?"#000":"#556",
+          borderRadius:8,cursor:"pointer",fontSize:15,fontWeight:700,
+        }}>{form.id?"Save Changes":"Log Fintech"}</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Trend Analysis ───────────────────────────────────────────────────────────
+
+function TrendAnalysis({vendors}) {
+  const byConf=useMemo(()=>{
+    const map={};
+    vendors.forEach(v=>{
+      const c=v.conference||"Unknown";
+      if(!map[c])map[c]={conf:c,vendors:[],total:0,pass:0};
+      map[c].vendors.push(v);map[c].total++;
+      if(v.mustHave)map[c].pass++;
+    });
+    return Object.values(map).map(c=>({...c,avg:(c.vendors.reduce((s,v)=>s+(v.effortAdj||0),0)/c.total).toFixed(2),passRate:Math.round(c.pass/c.total*100)}));
+  },[vendors]);
+
+  const byDept=useMemo(()=>{
+    const map={};
+    vendors.forEach(v=>{
+      (v.departmentFocus||[]).forEach(d=>{
+        if(!map[d])map[d]={dept:d,vendors:[],total:0};
+        map[d].vendors.push(v);map[d].total++;
+      });
+    });
+    return Object.values(map).map(d=>({...d,avg:(d.vendors.reduce((s,v)=>s+(v.effortAdj||0),0)/d.total).toFixed(2)})).sort((a,b)=>b.avg-a.avg);
+  },[vendors]);
+
+  const stageBreakdown=useMemo(()=>{
+    const map={};
+    vendors.forEach(v=>{const s=v.pipelineStage||"Identified";map[s]=(map[s]||0)+1;});
+    return Object.entries(map);
+  },[vendors]);
+
+  if(!vendors.length) return <div style={{textAlign:"center",padding:80,color:"#334"}}><div style={{fontSize:40,marginBottom:12}}>📈</div><div style={{fontSize:16,color:"#556"}}>No data yet — log some vendors first</div></div>;
+
+  return (
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
+      <div style={css.card}>
+        <h3 style={{margin:"0 0 16px",fontSize:13,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.1em"}}>By Conference</h3>
+        {byConf.map(c=>(
+          <div key={c.conf} style={{marginBottom:14}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+              <span style={{fontSize:13,color:"#fff",fontWeight:600}}>{c.conf}</span>
+              <span style={{fontSize:13,color:"#00d4aa",fontWeight:700}}>{c.avg}</span>
+            </div>
+            <ScoreBar value={parseFloat(c.avg)} max={5}/>
+            <div style={{fontSize:11,color:"#445",marginTop:3}}>{c.total} vendors · {c.passRate}% pass rate</div>
+          </div>
+        ))}
+      </div>
+      <div style={css.card}>
+        <h3 style={{margin:"0 0 16px",fontSize:13,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.1em"}}>By Department</h3>
+        {byDept.map(d=>(
+          <div key={d.dept} style={{marginBottom:14}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+              <span style={{fontSize:13,color:"#fff"}}>{d.dept}</span>
+              <span style={{fontSize:13,color:"#4db8ff",fontWeight:700}}>{d.avg}</span>
+            </div>
+            <ScoreBar value={parseFloat(d.avg)} max={5} color="#4db8ff"/>
+            <div style={{fontSize:11,color:"#445",marginTop:3}}>{d.total} vendors</div>
+          </div>
+        ))}
+      </div>
+      <div style={css.card}>
+        <h3 style={{margin:"0 0 16px",fontSize:13,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.1em"}}>Pipeline Stages</h3>
+        <div style={{display:"flex",flexWrap:"wrap",gap:10}}>
+          {PIPELINE_STAGES.map(stage=>{
+            const count=stageBreakdown.find(([s])=>s===stage)?.[1]||0;
+            return (
+              <div key={stage} style={{flex:"1 1 100px",padding:"12px 10px",background:`${STAGE_COLORS[stage]}11`,border:`1px solid ${STAGE_COLORS[stage]}33`,borderRadius:8,textAlign:"center"}}>
+                <div style={{fontSize:22,fontWeight:700,color:STAGE_COLORS[stage]}}>{count}</div>
+                <div style={{fontSize:11,color:"#556",marginTop:2}}>{stage}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div style={css.card}>
+        <h3 style={{margin:"0 0 16px",fontSize:13,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.1em"}}>Grade Distribution</h3>
+        {GRADES.slice(0,-1).map((g,gi)=>{
+          const count=vendors.filter(v=>(v.effortAdj||0)>=g.min&&(v.effortAdj||0)<(GRADES[gi-1]?.min??99)).length;
+          const pct=vendors.length?Math.round(count/vendors.length*100):0;
+          return (
+            <div key={g.grade} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+              <span style={{width:28,fontSize:13,fontWeight:700,color:g.color}}>{g.grade}</span>
+              <div style={{flex:1,height:8,background:"rgba(255,255,255,0.06)",borderRadius:4,overflow:"hidden"}}>
+                <div style={{width:`${pct}%`,height:"100%",background:g.color,borderRadius:4,transition:"width 0.5s"}}/>
+              </div>
+              <span style={{fontSize:12,color:"#445",minWidth:24}}>{count}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Board Summary ────────────────────────────────────────────────────────────
+
+function BoardSummary({vendors}) {
+  const top5=[...vendors].sort((a,b)=>(b.effortAdj||0)-(a.effortAdj||0)).slice(0,5);
+  const redFlags=vendors.filter(v=>!v.mustHave);
+  const stats={
+    total:vendors.length,
+    pass:vendors.filter(v=>v.mustHave).length,
+    avgScore:vendors.length?(vendors.reduce((s,v)=>s+(v.effortAdj||0),0)/vendors.length).toFixed(2):"—",
+    highPriority:vendors.filter(v=>v.strategicPriority==="High").length,
+  };
+  const pColor={High:"#ff6b6b",Medium:"#ffd93d",Low:"#6bcb77"};
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
+        <div>
+          <h2 style={{color:"#fff",fontFamily:"Georgia,serif",margin:"0 0 4px"}}>Board Summary</h2>
+          <div style={{fontSize:13,color:"#445"}}>Executive overview · {new Date().toLocaleDateString()}</div>
+        </div>
+        <button onClick={()=>window.print()} style={{padding:"8px 16px",background:"rgba(0,212,170,0.1)",border:"1px solid rgba(0,212,170,0.3)",borderRadius:6,color:"#00d4aa",cursor:"pointer",fontSize:13,minHeight:44}}>🖨 Print</button>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:24}}>
+        {[
+          {label:"Evaluated",value:stats.total,color:"#00d4aa"},
+          {label:"Must-Haves Pass",value:stats.pass,color:"#2ecc71"},
+          {label:"Avg Score",value:stats.avgScore,color:"#4db8ff"},
+          {label:"High Priority",value:stats.highPriority,color:"#ff6b6b"},
+        ].map(({label,value,color})=>(
+          <div key={label} style={{...css.card,textAlign:"center"}}>
+            <div style={{fontSize:28,fontWeight:700,color,fontFamily:"Georgia,serif"}}>{value}</div>
+            <div style={{fontSize:11,color:"#556",textTransform:"uppercase",letterSpacing:"0.08em",marginTop:4}}>{label}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{...css.card,marginBottom:20}}>
+        <h3 style={{margin:"0 0 16px",fontSize:13,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.1em"}}>Top 5 Strategic Opportunities</h3>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",minWidth:500}}>
+            <thead><tr style={{borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
+              {["#","Fintech","Departments","Score","Grade","Priority","Stage","Must-Haves"].map(h=>(
+                <th key={h} style={{textAlign:"left",padding:"4px 8px 10px",fontSize:10,color:"#446",textTransform:"uppercase"}}>{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>{top5.map((v,i)=>(
+              <tr key={v.id} style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                <td style={{padding:"10px 8px",fontSize:13,color:"#00d4aa",fontWeight:700}}>#{i+1}</td>
+                <td style={{fontSize:13,color:"#fff",fontWeight:600,padding:"10px 8px"}}>{v.fintechName}</td>
+                <td style={{fontSize:12,color:"#8899aa",padding:"10px 8px"}}>{(v.departmentFocus||[]).join(", ")}</td>
+                <td style={{fontSize:13,color:"#00d4aa",fontWeight:700,padding:"10px 8px"}}>{(v.effortAdj||0).toFixed(2)}</td>
+                <td style={{padding:"10px 8px"}}><span style={{padding:"2px 8px",borderRadius:4,background:`${getGrade(v.effortAdj||0).color}22`,color:getGrade(v.effortAdj||0).color,fontSize:12,fontWeight:700}}>{getGrade(v.effortAdj||0).grade}</span></td>
+                <td style={{padding:"10px 8px",fontSize:12,color:pColor[v.strategicPriority]}}>{v.strategicPriority}</td>
+                <td style={{padding:"10px 8px"}}><span style={{fontSize:11,padding:"2px 8px",borderRadius:10,background:`${STAGE_COLORS[v.pipelineStage||"Identified"]}22`,color:STAGE_COLORS[v.pipelineStage||"Identified"]}}>{v.pipelineStage||"Identified"}</span></td>
+                <td style={{padding:"10px 8px",fontSize:12,color:v.mustHave?"#2ecc71":"#e74c3c"}}>{v.mustHave?"✓ Pass":"✗ Fail"}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      </div>
+      {redFlags.length>0&&(
+        <div style={{...css.card,border:"1px solid rgba(231,76,60,0.25)",background:"rgba(231,76,60,0.04)"}}>
+          <h3 style={{margin:"0 0 14px",fontSize:13,color:"#e74c3c",textTransform:"uppercase",letterSpacing:"0.1em"}}>⚠ Red Flags ({redFlags.length})</h3>
+          <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+            {redFlags.map(v=>(
+              <div key={v.id} style={{padding:"8px 14px",background:"rgba(231,76,60,0.08)",border:"1px solid rgba(231,76,60,0.2)",borderRadius:8}}>
+                <div style={{fontSize:13,color:"#fff",fontWeight:600}}>{v.fintechName}</div>
+                <div style={{fontSize:11,color:"#e74c3c",marginTop:2}}>NCUA:{v.ncuaCompliance} DNA:{v.fiserDNA}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main App ─────────────────────────────────────────────────────────────────
+
+export default function App() {
+  const [vendors,setVendors]=useState([]);
+  const [departments,setDepartments]=useState(DEFAULT_DEPARTMENTS);
+  const [conferences,setConferences]=useState(DEFAULT_CONFERENCES);
+  const [weights,setWeights]=useState(DEFAULT_WEIGHTS);
+  const [weightLabels,setWeightLabels]=useState(DEFAULT_WEIGHT_LABELS);
+  const [mustHaves,setMustHaves]=useState(DEFAULT_MUST_HAVES);
+  const [view,setView]=useState("dashboard");
+  const [showForm,setShowForm]=useState(false);
+  const [quickMode,setQuickMode]=useState(false);
+  const [editItem,setEditItem]=useState(null);
+  const [showCompare,setShowCompare]=useState(false);
+  const [showSwipe,setShowSwipe]=useState(false);
+  const [filterDept,setFilterDept]=useState("All");
+  const [filterConf,setFilterConf]=useState("All");
+  const [filterStage,setFilterStage]=useState("All");
+  const [filterPriority,setFilterPriority]=useState("All");
+  const [minScore,setMinScore]=useState(0);
+  const [sortBy,setSortBy]=useState("effortAdj");
+  const [search,setSearch]=useState("");
+  const [deleteConfirm,setDeleteConfirm]=useState(null);
+  const [dupeWarning,setDupeWarning]=useState(null);
+  const [importText,setImportText]=useState("");
+  const [showImport,setShowImport]=useState(false);
+  const [saveStatus,setSaveStatus]=useState("saved");
+  const fileInputRef=useRef();
+
+  // ── Load from Supabase on mount + real-time subscriptions ──
+  useEffect(()=>{
+    const load = async () => {
+      setSaveStatus("saving");
+      try {
+        const { data: vendorRows } = await supabase.from("vendors").select("id, data");
+        if (vendorRows) setVendors(vendorRows.map(r => ({ ...r.data, id: r.id })));
+        const { data: configRows } = await supabase.from("app_config").select("key, value");
+        if (configRows) configRows.forEach(row => {
+          if (row.key === "departments") setDepartments(row.value);
+          if (row.key === "conferences") setConferences(row.value);
+          if (row.key === "weights") setWeights(row.value);
+          if (row.key === "mustHaves") setMustHaves(row.value);
+        if (row.key === "weightLabels") setWeightLabels(row.value);
+          if (row.key === "weightLabels") setWeightLabels(row.value);
+        });
+        setSaveStatus("saved");
+      } catch(e) { setSaveStatus("error"); }
+    };
+    load();
+
+    const vendorSub = supabase.channel("vendors-rt")
+      .on("postgres_changes", { event: "*", schema: "public", table: "vendors" }, () => {
+        supabase.from("vendors").select("id, data").then(({ data }) => {
+          if (data) setVendors(data.map(r => ({ ...r.data, id: r.id })));
+        });
+      }).subscribe();
+
+    const configSub = supabase.channel("config-rt")
+      .on("postgres_changes", { event: "*", schema: "public", table: "app_config" }, ({ new: row }) => {
+        if (row.key === "departments") setDepartments(row.value);
+        if (row.key === "conferences") setConferences(row.value);
+        if (row.key === "weights") setWeights(row.value);
+        if (row.key === "mustHaves") setMustHaves(row.value);
+      }).subscribe();
+
+    return () => { supabase.removeChannel(vendorSub); supabase.removeChannel(configSub); };
+  }, []);
+
+  const persistVendors = useCallback(async (vendorList) => {
+    setSaveStatus("saving");
+    try {
+      // Delete removed vendors then upsert remaining
+      const ids = vendorList.map(v => v.id);
+      await supabase.from("vendors").delete().not("id", "in", ids.length ? `(${ids.join(",")})` : "(0)");
+      if (ids.length) await supabase.from("vendors").upsert(vendorList.map(v => ({ id: v.id, data: v })), { onConflict: "id" });
+      setSaveStatus("saved");
+    } catch(e) { setSaveStatus("error"); }
+  }, []);
+
+  const persistConfig = useCallback(async (key, value) => {
+    try { await supabase.from("app_config").upsert({ key, value }, { onConflict: "key" }); }
+    catch(e) { setSaveStatus("error"); }
+  }, []);
+
+  const persist = useCallback(async (v, d, c, w, mh) => {
+    await persistVendors(v);
+    await persistConfig("departments", d);
+    await persistConfig("conferences", c);
+    await persistConfig("weights", w);
+    await persistConfig("mustHaves", mh);
+  }, [persistVendors, persistConfig]);
+
+  const addDepartment=d=>setDepartments(p=>{const n=p.includes(d)?p:[...p,d];persistConfig("departments",n);return n;});
+  const addConference=c=>setConferences(p=>{const n=p.includes(c)?p:[...p,c];persistConfig("conferences",n);return n;});
+
+  const enriched=useMemo(()=>vendors.map(v=>({
+    ...v,
+    weighted:calcWeighted(v,weights),
+    effortAdj:calcEffortAdjusted(calcWeighted(v,weights),v.implementationEffort),
+    mustHave:meetsMustHaves(v,mustHaves),
+  })).sort((a,b)=>b[sortBy]-a[sortBy]).map((v,i)=>({...v,rank:i+1})),[vendors,weights,mustHaves,sortBy]);
+
+  const filtered=useMemo(()=>enriched.filter(v=>
+    (filterDept==="All"||(v.departmentFocus||[]).includes(filterDept))&&
+    (filterConf==="All"||v.conference===filterConf)&&
+    (filterStage==="All"||v.pipelineStage===filterStage)&&
+    (filterPriority==="All"||v.strategicPriority===filterPriority)&&
+    (v.effortAdj||0)>=minScore&&
+    v.fintechName.toLowerCase().includes(search.toLowerCase())
+  ),[enriched,filterDept,filterConf,filterStage,filterPriority,minScore,search]);
+
+  const stats=useMemo(()=>({
+    total:vendors.length,
+    mustHavePass:enriched.filter(v=>v.mustHave).length,
+    avgScore:vendors.length?(enriched.reduce((s,v)=>s+(v.effortAdj||0),0)/vendors.length).toFixed(2):"—",
+    passRate:vendors.length?Math.round(enriched.filter(v=>v.mustHave).length/vendors.length*100):0,
+  }),[enriched,vendors]);
+
+  const deptBreakdown=useMemo(()=>departments.map(dept=>{
+    const items=enriched.filter(v=>(v.departmentFocus||[]).includes(dept));
+    return{dept,count:items.length,avg:items.length?(items.reduce((s,v)=>s+(v.effortAdj||0),0)/items.length).toFixed(2):"—",pass:items.filter(v=>v.mustHave).length};
+  }),[enriched,departments]);
+
+  const saveVendor=v=>{
+    const dupeCheck=vendors.find(x=>x.id!==v.id&&x.fintechName.toLowerCase()===v.fintechName.toLowerCase());
+    if(dupeCheck&&!v.id){setDupeWarning(v);return;}
+    const next=vendors.find(x=>x.id===v.id)?vendors.map(x=>x.id===v.id?v:x):[...vendors,v];
+    setVendors(next);persistVendors(next);
+    setShowForm(false);setEditItem(null);setDupeWarning(null);
+  };
+
+  const deleteVendor=async id=>{
+    await supabase.from("vendors").delete().eq("id",id);
+    setVendors(p=>p.filter(x=>x.id!==id));
+    setDeleteConfirm(null);
+  };
+
+  const handleWeightsChange=w=>{setWeights(w);persistConfig("weights",w);};
+  const handleWeightLabelsChange=l=>{setWeightLabels(l);persistConfig("weightLabels",l);};
+  const handleMustHavesChange=mh=>{setMustHaves(mh);persistConfig("mustHaves",mh);};
+
+  const handleSwipeAction=(vendor,newStage)=>{
+    const next=vendors.map(v=>v.id===vendor.id?{...v,pipelineStage:newStage}:v);
+    setVendors(next);persistVendors(next);
+  };
+
+  const handleImport=()=>{
+    try{
+      const rows=importText.trim().split("\n").filter(Boolean);
+      const imported=rows.map((row,i)=>{
+        const cols=row.split(",").map(c=>c.trim().replace(/^"|"$/g,""));
+        return{id:Date.now()+i,fintechName:cols[0]||"Unknown",departmentFocus:(cols[1]||"").split("|").filter(Boolean),
+          conference:cols[2]||"",conferenceDate:cols[3]||"",
+          internationalSupport:parseInt(cols[4])||3,ncuaCompliance:parseInt(cols[5])||3,
+          scalability:parseInt(cols[6])||3,fiserDNA:parseInt(cols[7])||3,
+          alkami:parseInt(cols[8])||3,meridianLink:parseInt(cols[9])||3,
+          departmentFit:parseInt(cols[10])||3,implementationEffort:parseInt(cols[11])||3,
+          strategicPriority:cols[16]||"Medium",pipelineStage:cols[17]||"Identified",
+          nextStep:cols[18]||"Schedule Demo",cusUsing:cols[19]||"",cuAssetSize:cols[20]||"",
+          referenceContact:cols[21]||"",notes:cols[22]||"",noteHistory:[]};
+      });
+      const next=[...vendors,...imported];
+      setVendors(next);persistVendors(next);
+      setShowImport(false);setImportText("");
+    }catch(e){alert("Import failed — check your CSV format.");}
+  };
+
+  const handleRestoreJSON=e=>{
+    const file=e.target.files?.[0];
+    if(!file)return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      try{
+        const d=JSON.parse(ev.target.result);
+        if(d.vendors)setVendors(d.vendors);
+        if(d.departments)setDepartments(d.departments);
+        if(d.conferences)setConferences(d.conferences);
+        if(d.weights)setWeights(d.weights);
+        if(d.mustHaves)setMustHaves(d.mustHaves);
+        if(d.weightLabels)setWeightLabels(d.weightLabels);
+        persist(d.vendors||[],d.departments||DEFAULT_DEPARTMENTS,d.conferences||DEFAULT_CONFERENCES,d.weights||DEFAULT_WEIGHTS,d.mustHaves||DEFAULT_MUST_HAVES).then(()=>setSaveStatus("saved"));
+        if(d.weightLabels)persistConfig("weightLabels",d.weightLabels);
+        alert(`✓ Restored ${d.vendors?.length||0} vendors successfully.`);
+      }catch(err){alert("Restore failed — invalid file.");}
+    };
+    reader.readAsText(file);
+  };
+
+  const s2={background:"#0f1923",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"8px 14px",color:"#fff",fontSize:13};
+  const pColor={High:"#ff6b6b",Medium:"#ffd93d",Low:"#6bcb77"};
+  const NAV=[["dashboard","Dashboard"],["list","Vendors"],["trend","Trends"],["board","Board"],["weights","Weights"]];
+
+  return (
+    <div style={{minHeight:"100vh",background:"#080f18",color:"#c8d8e8",fontFamily:"'Segoe UI',sans-serif"}}>
+      {/* Header */}
+      <div style={{borderBottom:"1px solid rgba(0,212,170,0.15)",padding:"0 16px",background:"rgba(0,0,0,0.5)",position:"sticky",top:0,zIndex:100}}>
+        <div style={{maxWidth:1300,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",height:58}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <div style={{width:30,height:30,background:"linear-gradient(135deg,#00d4aa,#0077cc)",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15}}>⚡</div>
+            <div>
+              <div style={{fontSize:14,fontWeight:700,color:"#fff",fontFamily:"Georgia,serif",lineHeight:1.2}}>FinTech Scout</div>
+              <div style={{fontSize:9,color:"#4488aa",letterSpacing:"0.1em",textTransform:"uppercase"}}>Emerging Technologies</div>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:2}}>
+            {NAV.map(([id,label])=>(
+              <button key={id} onClick={()=>setView(id)} style={{padding:"5px 10px",border:"none",borderRadius:6,background:view===id?"rgba(0,212,170,0.15)":"none",color:view===id?"#00d4aa":"#667",cursor:"pointer",fontSize:12,fontWeight:view===id?600:400,whiteSpace:"nowrap"}}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <div style={{display:"flex",gap:6,alignItems:"center"}}>
+            <div style={{fontSize:10,color:saveStatus==="saved"?"#2ecc71":saveStatus==="saving"?"#ffd93d":"#e74c3c",display:"flex",alignItems:"center",gap:3}}>
+              <span style={{width:6,height:6,borderRadius:"50%",background:"currentColor",display:"inline-block"}}/>
+              {saveStatus==="saved"?"Saved":saveStatus==="saving"?"Saving...":"Error"}
+            </div>
+            <button onClick={()=>setShowCompare(true)} style={{padding:"6px 10px",background:"rgba(255,215,61,0.1)",border:"1px solid rgba(255,215,61,0.2)",borderRadius:6,color:"#ffd93d",cursor:"pointer",fontSize:12,whiteSpace:"nowrap"}}>⚖️ Compare</button>
+            <button onClick={()=>setShowSwipe(true)} style={{padding:"6px 10px",background:"rgba(77,184,255,0.1)",border:"1px solid rgba(77,184,255,0.2)",borderRadius:6,color:"#4db8ff",cursor:"pointer",fontSize:12,whiteSpace:"nowrap"}}>👆 Swipe</button>
+            <button onClick={()=>{setQuickMode(true);setEditItem(null);setShowForm(true);}} style={{padding:"6px 10px",background:"rgba(0,212,170,0.1)",border:"1px solid rgba(0,212,170,0.2)",borderRadius:6,color:"#00d4aa",cursor:"pointer",fontSize:12,fontWeight:700,whiteSpace:"nowrap"}}>⚡ Quick</button>
+            <button onClick={()=>{setQuickMode(false);setEditItem(null);setShowForm(true);}} style={{padding:"7px 14px",background:"#00d4aa",border:"none",borderRadius:8,color:"#000",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>+ Log</button>
+          </div>
+        </div>
+      </div>
+
+      <div style={{maxWidth:1300,margin:"0 auto",padding:"24px 16px"}}>
+
+        {/* DASHBOARD */}
+        {view==="dashboard"&&<>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:24}}>
+            {[
+              {label:"Vendors",value:stats.total,icon:"🏢",color:"#00d4aa"},
+              {label:"Must-Haves Pass",value:stats.mustHavePass,icon:"✅",color:"#2ecc71"},
+              {label:"Pass Rate",value:stats.total?`${stats.passRate}%`:"—",icon:"📊",color:"#4db8ff"},
+              {label:"Avg Score",value:stats.avgScore,icon:"⭐",color:"#ffd93d"},
+            ].map(({label,value,icon,color})=>(
+              <div key={label} style={css.card}>
+                <div style={{fontSize:20,marginBottom:6}}>{icon}</div>
+                <div style={{fontSize:26,fontWeight:700,color,fontFamily:"Georgia,serif"}}>{value}</div>
+                <div style={{fontSize:11,color:"#556",textTransform:"uppercase",letterSpacing:"0.08em",marginTop:2}}>{label}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:18,marginBottom:20}}>
+            <div style={css.card}>
+              <h3 style={{margin:"0 0 14px",fontSize:13,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.1em"}}>Department Breakdown</h3>
+              <table style={{width:"100%",borderCollapse:"collapse"}}>
+                <thead><tr style={{borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
+                  {["Department","Count","Avg","Pass"].map(h=><th key={h} style={{textAlign:"left",padding:"4px 0 8px",fontSize:10,color:"#446",textTransform:"uppercase"}}>{h}</th>)}
+                </tr></thead>
+                <tbody>{deptBreakdown.map(({dept,count,avg,pass})=>(
+                  <tr key={dept} style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                    <td style={{padding:"7px 0",fontSize:13,color:"#aabbcc"}}>{dept}</td>
+                    <td style={{fontSize:13,color:count>0?"#00d4aa":"#334"}}>{count}</td>
+                    <td style={{fontSize:13,color:"#4db8ff"}}>{avg}</td>
+                    <td style={{fontSize:13,color:pass>0?"#2ecc71":"#334"}}>{pass}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+            <div style={css.card}>
+              <h3 style={{margin:"0 0 14px",fontSize:13,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.1em"}}>Top 5 by Effort-Adjusted Score</h3>
+              {enriched.slice(0,5).length===0
+                ?<div style={{color:"#334",fontSize:13,padding:"20px 0",textAlign:"center"}}>No vendors logged yet</div>
+                :enriched.slice(0,5).map((v,i)=>(
+                  <div key={v.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                    <div style={{width:22,height:22,borderRadius:"50%",background:i===0?"#00d4aa":"rgba(255,255,255,0.07)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:i===0?"#000":"#556",fontWeight:700,flexShrink:0}}>{i+1}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,color:"#fff",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{v.fintechName}</div>
+                      <div style={{fontSize:11,color:"#556"}}>{(v.departmentFocus||[]).join(", ")}</div>
+                    </div>
+                    <span style={{padding:"1px 6px",borderRadius:4,background:`${getGrade(v.effortAdj||0).color}22`,color:getGrade(v.effortAdj||0).color,fontSize:11,fontWeight:700}}>{getGrade(v.effortAdj||0).grade}</span>
+                    <div style={{fontSize:13,color:"#00d4aa",fontWeight:700}}>{(v.effortAdj||0).toFixed(2)}</div>
+                    <div style={{fontSize:11,color:v.mustHave?"#2ecc71":"#e74c3c"}}>{v.mustHave?"✓":"✗"}</div>
+                  </div>
+                ))
+              }
+            </div>
+          </div>
+
+          {/* Pipeline */}
+          <div style={{...css.card,marginBottom:20}}>
+            <h3 style={{margin:"0 0 14px",fontSize:13,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.1em"}}>Pipeline Overview</h3>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              {PIPELINE_STAGES.map(stage=>{
+                const count=enriched.filter(v=>v.pipelineStage===stage).length;
+                const pct=vendors.length?Math.round(count/vendors.length*100):0;
+                return(
+                  <div key={stage} onClick={()=>{setFilterStage(stage);setView("list");}} style={{flex:"1 1 80px",textAlign:"center",padding:"12px 8px",background:`${STAGE_COLORS[stage]}11`,border:`1px solid ${STAGE_COLORS[stage]}33`,borderRadius:8,cursor:"pointer"}}>
+                    <div style={{fontSize:20,fontWeight:700,color:STAGE_COLORS[stage]}}>{count}</div>
+                    <div style={{fontSize:10,color:"#556",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{stage}</div>
+                    {vendors.length>0&&<div style={{fontSize:10,color:STAGE_COLORS[stage],marginTop:2}}>{pct}%</div>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Data Management */}
+          <div style={{...css.card,marginBottom:20}}>
+            <h3 style={{margin:"0 0 14px",fontSize:13,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.1em"}}>Data Management</h3>
+            <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+              <button onClick={()=>exportCSV(enriched,weights)} style={{padding:"10px 16px",background:"rgba(0,212,170,0.1)",border:"1px solid rgba(0,212,170,0.2)",borderRadius:8,color:"#00d4aa",cursor:"pointer",fontSize:13,minHeight:44}}>📥 Export CSV</button>
+              <button onClick={()=>exportJSON({vendors,departments,conferences,weights,weightLabels,mustHaves})} style={{padding:"10px 16px",background:"rgba(77,184,255,0.1)",border:"1px solid rgba(77,184,255,0.2)",borderRadius:8,color:"#4db8ff",cursor:"pointer",fontSize:13,minHeight:44}}>💾 Backup JSON</button>
+              <button onClick={()=>fileInputRef.current?.click()} style={{padding:"10px 16px",background:"rgba(255,215,61,0.1)",border:"1px solid rgba(255,215,61,0.2)",borderRadius:8,color:"#ffd93d",cursor:"pointer",fontSize:13,minHeight:44}}>📤 Restore JSON</button>
+              <button onClick={()=>setShowImport(true)} style={{padding:"10px 16px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,color:"#889",cursor:"pointer",fontSize:13,minHeight:44}}>📋 Import CSV</button>
+              <input ref={fileInputRef} type="file" accept=".json" onChange={handleRestoreJSON} style={{display:"none"}}/>
+              {vendors.length>0&&<button onClick={()=>{if(window.confirm("Clear ALL vendor data? This cannot be undone.")){setVendors([]);supabase.from("vendors").delete().neq("id",0);}}} style={{padding:"10px 16px",background:"rgba(231,76,60,0.08)",border:"1px solid rgba(231,76,60,0.2)",borderRadius:8,color:"#e74c3c",cursor:"pointer",fontSize:13,minHeight:44}}>🗑 Clear All</button>}
+            </div>
+          </div>
+
+          {/* Red Flags */}
+          <div style={{background:"rgba(231,76,60,0.06)",border:"1px solid rgba(231,76,60,0.2)",borderRadius:10,padding:20}}>
+            <h3 style={{margin:"0 0 14px",fontSize:13,color:"#e74c3c",textTransform:"uppercase",letterSpacing:"0.1em"}}>⚠ Red Flags — Must-Have Failures</h3>
+            {enriched.filter(v=>!v.mustHave).length===0
+              ?<div style={{color:"#446",fontSize:13}}>No red flags — all vendors meet must-have requirements.</div>
+              :<table style={{width:"100%",borderCollapse:"collapse"}}>
+                <thead><tr>{["Fintech","Departments","Failing Criteria","Score"].map(h=><th key={h} style={{textAlign:"left",padding:"4px 0 8px",fontSize:10,color:"#e74c3c",textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
+                <tbody>{enriched.filter(v=>!v.mustHave).map(v=>{
+                  const failing=Object.entries(mustHaves).filter(([k,min])=>(v[k]||0)<min).map(([k])=>weightLabels[k]||k);
+                  return (
+                    <tr key={v.id}>
+                      <td style={{padding:"6px 0",fontSize:13,color:"#fff"}}>{v.fintechName}</td>
+                      <td style={{fontSize:12,color:"#aaa"}}>{(v.departmentFocus||[]).join(", ")}</td>
+                      <td style={{fontSize:12,color:"#e74c3c"}}>{failing.join(", ")}</td>
+                      <td style={{fontSize:13,color:"#ffd93d"}}>{(v.effortAdj||0).toFixed(2)}</td>
+                    </tr>
+                  );
+                })}</tbody>
+              </table>
+            }
+          </div>
+        </>}
+
+        {/* ALL VENDORS */}
+        {view==="list"&&<>
+          <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search..." style={{flex:"1 1 160px",...s2,minHeight:40}}/>
+            {[
+              {val:filterDept,set:setFilterDept,opts:departments,label:"All Depts"},
+              {val:filterConf,set:setFilterConf,opts:conferences,label:"All Conferences"},
+              {val:filterStage,set:setFilterStage,opts:PIPELINE_STAGES,label:"All Stages"},
+              {val:filterPriority,set:setFilterPriority,opts:["High","Medium","Low"],label:"All Priority"},
+            ].map(({val,set,opts,label})=>(
+              <select key={label} value={val} onChange={e=>set(e.target.value)} style={{...s2,minHeight:40}}>
+                <option value="All">{label}</option>
+                {opts.map(o=><option key={o}>{o}</option>)}
+              </select>
+            ))}
+            <select value={sortBy} onChange={e=>setSortBy(e.target.value)} style={{...s2,minHeight:40}}>
+              <option value="effortAdj">Effort Adj ↓</option>
+              <option value="weighted">Weighted ↓</option>
+            </select>
+            <div style={{display:"flex",alignItems:"center",gap:4}}>
+              <span style={{fontSize:12,color:"#445"}}>Min:</span>
+              <input type="number" min="0" max="5" step="0.5" value={minScore} onChange={e=>setMinScore(Number(e.target.value))} style={{width:52,...s2,padding:"8px 6px",minHeight:40}}/>
+            </div>
+            <span style={{color:"#445",fontSize:12}}>{filtered.length} shown</span>
+          </div>
+
+          {filtered.length===0
+            ?<div style={{textAlign:"center",padding:60}}><div style={{fontSize:36,marginBottom:12}}>📋</div><div style={{fontSize:15,color:"#556"}}>No vendors match your filters</div></div>
+            :<div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {filtered.map(v=>(
+                <div key={v.id} style={{...css.card,display:"grid",gridTemplateColumns:"30px 1fr auto auto auto auto",alignItems:"center",gap:12,padding:"13px 16px"}}>
+                  <div style={{width:26,height:26,borderRadius:"50%",background:v.rank<=3?"rgba(0,212,170,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${v.rank<=3?"rgba(0,212,170,0.3)":"rgba(255,255,255,0.08)"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:v.rank<=3?"#00d4aa":"#445",fontWeight:700}}>#{v.rank}</div>
+                  <div style={{minWidth:0}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3,flexWrap:"wrap"}}>
+                      <span style={{fontSize:14,fontWeight:600,color:"#fff"}}>{v.fintechName}</span>
+                      <span style={{fontSize:10,padding:"2px 6px",borderRadius:4,background:`${pColor[v.strategicPriority]}22`,color:pColor[v.strategicPriority],border:`1px solid ${pColor[v.strategicPriority]}44`}}>{v.strategicPriority}</span>
+                      <span style={{fontSize:10,padding:"2px 7px",borderRadius:10,background:`${STAGE_COLORS[v.pipelineStage||"Identified"]}22`,color:STAGE_COLORS[v.pipelineStage||"Identified"]}}>{v.pipelineStage||"Identified"}</span>
+                      <span style={{fontSize:11,color:v.mustHave?"#2ecc71":"#e74c3c"}}>{v.mustHave?"✓":"✗"}</span>
+                    </div>
+                    <div style={{display:"flex",gap:8,fontSize:12,color:"#557",flexWrap:"wrap"}}>
+                      <span>{(v.departmentFocus||[]).join(", ")}</span>
+                      {v.conference&&<span>· {v.conference}</span>}
+                    </div>
+                    {v.notes&&<div style={{fontSize:11,color:"#445",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:360}}>{v.notes}</div>}
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:17,fontWeight:700,color:"#00d4aa"}}>{(v.effortAdj||0).toFixed(2)}</div>
+                    <div style={{display:"inline-block",padding:"1px 7px",borderRadius:4,background:`${getGrade(v.effortAdj||0).color}22`,color:getGrade(v.effortAdj||0).color,fontSize:11,fontWeight:700}}>{getGrade(v.effortAdj||0).grade}</div>
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:3,width:96}}>
+                    {[["DNA",v.fiserDNA],["NCUA",v.ncuaCompliance],["Alkami",v.alkami],["Merit.",v.meridianLink],["Intl",v.internationalSupport],["Dept",v.departmentFit]].map(([lbl,val])=>(
+                      <div key={lbl} style={{textAlign:"center",background:"rgba(255,255,255,0.04)",borderRadius:4,padding:"2px 0"}}>
+                        <div style={{fontSize:11,fontWeight:700,color:val>=4?"#00d4aa":val>=3?"#ffd93d":"#e74c3c"}}>{val}</div>
+                        <div style={{fontSize:8,color:"#334"}}>{lbl}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{display:"flex",gap:5}}>
+                    <button onClick={()=>{setEditItem(v);setQuickMode(false);setShowForm(true);}} style={{padding:"6px 10px",background:"rgba(77,184,255,0.1)",border:"1px solid rgba(77,184,255,0.2)",borderRadius:6,color:"#4db8ff",fontSize:12,cursor:"pointer",minHeight:36}}>Edit</button>
+                    <button onClick={()=>setDeleteConfirm(v.id)} style={{padding:"6px 8px",background:"rgba(231,76,60,0.1)",border:"1px solid rgba(231,76,60,0.2)",borderRadius:6,color:"#e74c3c",fontSize:12,cursor:"pointer",minHeight:36}}>✕</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          }
+        </>}
+
+        {view==="trend"&&<TrendAnalysis vendors={enriched}/>}
+        {view==="board"&&<BoardSummary vendors={enriched}/>}
+        {view==="weights"&&<WeightsEditor weights={weights} weightLabels={weightLabels} onChange={handleWeightsChange} onLabelsChange={handleWeightLabelsChange} mustHaves={mustHaves} onMustHavesChange={handleMustHavesChange}/>}
+      </div>
+
+      {/* Swipe Mode */}
+      {showSwipe&&(
+        <Modal onClose={()=>setShowSwipe(false)}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+            <h3 style={{color:"#fff",margin:0,fontFamily:"Georgia,serif"}}>👆 Swipe Triage</h3>
+            <button onClick={()=>setShowSwipe(false)} style={{background:"none",border:"none",color:"#556",fontSize:22,cursor:"pointer",minWidth:44,minHeight:44}}>✕</button>
+          </div>
+          <p style={{color:"#556",fontSize:13,marginBottom:16}}>Swipe right (or tap Proceed) to advance to Demo Scheduled. Swipe left (or tap Pass) to mark as Passed.</p>
+          {enriched.filter(v=>v.pipelineStage==="Identified").length===0
+            ?<div style={{textAlign:"center",padding:40,color:"#334"}}>
+              <div style={{fontSize:32,marginBottom:8}}>✓</div>
+              <div style={{fontSize:14,color:"#556"}}>No vendors left in Identified stage</div>
+            </div>
+            :enriched.filter(v=>v.pipelineStage==="Identified").map(v=>(
+              <SwipeCard key={v.id} vendor={v}
+                onPass={v=>handleSwipeAction(v,"Passed")}
+                onProceed={v=>handleSwipeAction(v,"Demo Scheduled")}
+                onEdit={v=>{setEditItem(v);setQuickMode(false);setShowSwipe(false);setShowForm(true);}}/>
+            ))
+          }
+        </Modal>
+      )}
+
+      {/* Compare Modal */}
+      {showCompare&&(
+        <Modal onClose={()=>setShowCompare(false)} wide>
+          <CompareView vendors={enriched} weights={weights} mustHaves={mustHaves} onClose={()=>setShowCompare(false)}/>
+        </Modal>
+      )}
+
+      {/* Entry Form */}
+      {showForm&&(
+        <Modal onClose={()=>{setShowForm(false);setEditItem(null);}} wide>
+          <EntryForm initial={editItem} onSave={saveVendor} onClose={()=>{setShowForm(false);setEditItem(null);}}
+            departments={departments} conferences={conferences}
+            onAddDepartment={addDepartment} onAddConference={addConference}
+            weights={weights} weightLabels={weightLabels} mustHaves={mustHaves} quickMode={quickMode}/>
+        </Modal>
+      )}
+
+      {/* Dupe Warning */}
+      {dupeWarning&&(
+        <Modal onClose={()=>setDupeWarning(null)}>
+          <div style={{textAlign:"center",padding:20}}>
+            <div style={{fontSize:36,marginBottom:16}}>⚠️</div>
+            <h3 style={{color:"#ffd93d",marginBottom:8}}>Duplicate Detected</h3>
+            <p style={{color:"#889",marginBottom:24}}>A vendor named "<strong style={{color:"#fff"}}>{dupeWarning.fintechName}</strong>" already exists. Save anyway?</p>
+            <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+              <button onClick={()=>setDupeWarning(null)} style={{padding:"12px 20px",background:"none",border:"1px solid rgba(255,255,255,0.15)",color:"#889",borderRadius:6,cursor:"pointer",minHeight:48}}>Cancel</button>
+              <button onClick={()=>{const next=[...vendors,{...dupeWarning,id:Date.now()}];setVendors(next);persistVendors(next);setShowForm(false);setDupeWarning(null);}}
+                style={{padding:"12px 20px",background:"#ffd93d",border:"none",color:"#000",borderRadius:6,cursor:"pointer",fontWeight:700,minHeight:48}}>Save Anyway</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Delete Confirm */}
+      {deleteConfirm&&(
+        <Modal onClose={()=>setDeleteConfirm(null)}>
+          <div style={{textAlign:"center",padding:20}}>
+            <div style={{fontSize:36,marginBottom:16}}>🗑</div>
+            <h3 style={{color:"#fff",marginBottom:8}}>Delete this vendor?</h3>
+            <p style={{color:"#556",marginBottom:24}}>This cannot be undone.</p>
+            <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+              <button onClick={()=>setDeleteConfirm(null)} style={{padding:"12px 20px",background:"none",border:"1px solid rgba(255,255,255,0.15)",color:"#889",borderRadius:6,cursor:"pointer",minHeight:48}}>Cancel</button>
+              <button onClick={()=>deleteVendor(deleteConfirm)} style={{padding:"12px 20px",background:"#e74c3c",border:"none",color:"#fff",borderRadius:6,cursor:"pointer",fontWeight:700,minHeight:48}}>Delete</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Import Modal */}
+      {showImport&&(
+        <Modal onClose={()=>setShowImport(false)}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+            <h3 style={{color:"#fff",margin:0,fontFamily:"Georgia,serif"}}>Import CSV</h3>
+            <button onClick={()=>setShowImport(false)} style={{background:"none",border:"none",color:"#556",fontSize:22,cursor:"pointer",minWidth:44,minHeight:44}}>✕</button>
+          </div>
+          <p style={{color:"#556",fontSize:13,marginBottom:14}}>Paste CSV rows — one vendor per line. Columns: Name, Departments (pipe-separated), Conference, Date, Int'l, NCUA, Scale, DNA, Alkami, MeridianLink, DeptFit, Effort, -, -, -, -, Priority, Stage, NextStep, CUs, AssetSize, Reference, Notes</p>
+          <textarea value={importText} onChange={e=>setImportText(e.target.value)} rows={7}
+            placeholder="Zest AI,Consumer Lending|Risk Management,Finovate Spring 2025,2025-05-01,4,4,4,4,3,3,4,2,,,,, High,Demo Scheduled,Schedule Demo,5 CUs,$500M-2B,John Smith,Great AI underwriting"
+            style={{...css.input,resize:"vertical",fontFamily:"monospace",fontSize:12}}/>
+          <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:14}}>
+            <button onClick={()=>setShowImport(false)} style={{padding:"12px 20px",background:"none",border:"1px solid rgba(255,255,255,0.15)",color:"#889",borderRadius:6,cursor:"pointer",minHeight:48}}>Cancel</button>
+            <button onClick={handleImport} style={{padding:"12px 20px",background:"#00d4aa",border:"none",color:"#000",borderRadius:6,cursor:"pointer",fontWeight:700,minHeight:48}}>Import</button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
