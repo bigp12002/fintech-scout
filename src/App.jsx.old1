@@ -61,34 +61,13 @@ const GRADES = [
   {min:1.5,grade:"D",color:"#ff9f43"},{min:0,grade:"F",color:"#e74c3c"},
 ];
 
-// Structured note fields captured at every conference pitch
-const NOTE_FIELDS = [
-  { key:"notePitchSummary",   label:"Pitch Summary",          placeholder:"What problem do they claim to solve? (1–2 sentences)" },
-  { key:"noteDifferentiator", label:"Key Differentiator",     placeholder:"What makes them different from competitors they named?" },
-  { key:"noteCUExperience",   label:"CU Experience",          placeholder:"Do they have CU clients? How many? What asset sizes?" },
-  { key:"noteIntegration",    label:"Integration Story",      placeholder:"How do they connect to Fiserv DNA / Alkami / MeridianLink?" },
-  { key:"notePricing",        label:"Pricing Model",          placeholder:"Per member? Flat fee? Revenue share? Implementation cost?" },
-  { key:"noteTimeline",       label:"Implementation Timeline",placeholder:"How long to go live? Who does the work?" },
-  { key:"noteDemoQuality",    label:"Demo Quality",           placeholder:"Was the product polished or early-stage? Live demo or slides?" },
-  { key:"noteRedFlags",       label:"Red Flags",              placeholder:"Anything concerning said at the booth or in the demo?" },
-  { key:"noteFollowUp",       label:"Follow-Up Action",       placeholder:"Who do you need to contact? What do you need from them?" },
-];
-
 const EMPTY_FORM = {
   id:null,fintechName:"",departmentFocus:[],conference:"",conferenceDate:"",
   internationalSupport:3,ncuaCompliance:3,scalability:3,fiserDNA:3,
   alkami:3,meridianLink:3,departmentFit:3,implementationEffort:3,
   cusUsing:"",cuAssetSize:"",referenceContact:"",
   strategicPriority:"Medium",nextStep:"Schedule Demo",
-  pipelineStage:"Identified",
-  // Structured notes
-  notePitchSummary:"",noteDifferentiator:"",noteCUExperience:"",
-  noteIntegration:"",notePricing:"",noteTimeline:"",
-  noteDemoQuality:"",noteRedFlags:"",noteFollowUp:"",
-  notes:"",noteHistory:[],
-  folderId:null,
-  // Per-vendor scoring snapshot
-  vendorWeights:null,vendorWeightLabels:null,vendorMustHaves:null,
+  pipelineStage:"Identified",notes:"",noteHistory:[],
 };
 
 // Supabase is the source of truth
@@ -539,35 +518,13 @@ function WeightsEditor({weights,weightLabels,onChange,onLabelsChange,mustHaves,o
 
 // ─── Entry Form ───────────────────────────────────────────────────────────────
 
-function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartment,onAddConference,weights,weightLabels,mustHaves,folders=[],quickMode=false}) {
-  const [form,setForm]=useState(()=>{
-    const base = initial || EMPTY_FORM;
-    return {
-      ...base,
-      // If new vendor: pre-populate scores for all current global weight keys
-      ...(!initial ? Object.keys(weights).reduce((acc,k)=>({...acc,[k]:3}),{}) : {}),
-    };
-  });
+function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartment,onAddConference,weights,weightLabels,mustHaves,quickMode=false}) {
+  const [form,setForm]=useState(initial||EMPTY_FORM);
   const [tab,setTab]=useState("basic");
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
-
-  // Use the vendor's own scoring snapshot if editing an existing vendor, else use global
-  const activeWeights = form.vendorWeights || weights;
-  const activeWeightLabels = form.vendorWeightLabels || weightLabels;
-  const activeMustHaves = form.vendorMustHaves || mustHaves;
-
-  const resetToGlobal = () => setForm(f=>({
-    ...f,
-    vendorWeights: null,
-    vendorWeightLabels: null,
-    vendorMustHaves: null,
-    // re-init scores for new global keys
-    ...Object.keys(weights).reduce((acc,k)=>({...acc,[k]:f[k]||3}),{}),
-  }));
-
-  const weighted=calcWeighted(form,activeWeights);
+  const weighted=calcWeighted(form,weights);
   const effortAdj=calcEffortAdjusted(weighted,form.implementationEffort);
-  const mustHave=meetsMustHaves(form,activeMustHaves);
+  const mustHave=meetsMustHaves(form,mustHaves);
   const grade=getGrade(effortAdj);
   const tabs=quickMode?["basic","scores"]:["basic","scores","reference","notes"];
 
@@ -635,45 +592,18 @@ function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartme
             <label style={css.label}>Conference Date</label>
             <input type="date" value={form.conferenceDate} onChange={e=>set("conferenceDate",e.target.value)} style={{...css.input,colorScheme:"dark",minHeight:44}}/>
           </div>
-          <div style={{gridColumn:"1/-1"}}>
-            <label style={css.label}>Folder (optional)</label>
-            <div style={{display:"flex",gap:6}}>
-              <select value={form.folderId||""} onChange={e=>set("folderId",e.target.value||null)}
-                style={{...css.selectDark,flex:1,color:form.folderId?"#fff":"#556",minHeight:44}}>
-                <option value="">No folder</option>
-                {folders.map(f=><option key={f.id} value={f.id}>{f.name}</option>)}
-              </select>
-            </div>
-            {folders.length===0&&<div style={{fontSize:11,color:"#334",marginTop:4}}>Create folders in the Folders view to organize fintechs by problem/theme.</div>}
-          </div>
         </div>
       )}
 
       {tab==="scores"&&(
-        <div>
-          {/* Scoring model info banner */}
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,padding:"10px 14px",background:"rgba(0,212,170,0.05)",borderRadius:8,border:"1px solid rgba(0,212,170,0.12)"}}>
-            <div>
-              <div style={{fontSize:12,color:"#00d4aa",fontWeight:600}}>
-                {form.vendorWeights ? "📌 Using this vendor's saved scoring model" : "📋 Using current global scoring model (default)"}
-              </div>
-              <div style={{fontSize:11,color:"#445",marginTop:2}}>
-                {form.vendorWeights ? "Scores are based on the model active when this vendor was first saved." : "This model will be snapshotted and saved with this vendor."}
-              </div>
-            </div>
-            {form.vendorWeights && (
-              <button onClick={resetToGlobal} style={{padding:"6px 12px",background:"rgba(255,215,61,0.1)",border:"1px solid rgba(255,215,61,0.3)",borderRadius:6,color:"#ffd93d",cursor:"pointer",fontSize:12,whiteSpace:"nowrap",marginLeft:12}}>↺ Reset to Global</button>
-            )}
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 24px"}}>
-            {Object.keys(activeWeights).map(k=>(
-              <RatingInput key={k} label={`${(activeWeightLabels||{})[k]||k} (${activeWeights[k]}%)`}
-                value={form[k]||3} onChange={v=>set(k,v)}
-                highlight={activeMustHaves[k]>1}
-                hint={activeMustHaves[k]>1?`Must-Have: ≥${activeMustHaves[k]} required`:null}/>
-            ))}
-            <RatingInput label="Implementation Effort (1=Easy, 5=Hard)" value={form.implementationEffort} onChange={v=>set("implementationEffort",v)} hint="Higher effort penalizes adjusted score"/>
-          </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 24px"}}>
+          {Object.keys(weights).map(k=>(
+            <RatingInput key={k} label={`${(weightLabels||{})[k]||k} (${weights[k]}%)`}
+              value={form[k]||3} onChange={v=>set(k,v)}
+              highlight={mustHaves[k]>1}
+              hint={mustHaves[k]>1?`Must-Have: ≥${mustHaves[k]} required`:null}/>
+          ))}
+          <RatingInput label="Implementation Effort (1=Easy, 5=Hard)" value={form.implementationEffort} onChange={v=>set("implementationEffort",v)} hint="Higher effort penalizes adjusted score"/>
         </div>
       )}
 
@@ -700,26 +630,10 @@ function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartme
 
       {tab==="notes"&&(
         <div>
-          {/* Structured conference capture fields */}
-          <div style={{marginBottom:20,padding:12,background:"rgba(0,212,170,0.04)",border:"1px solid rgba(0,212,170,0.12)",borderRadius:8}}>
-            <div style={{fontSize:11,color:"#00d4aa",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:12,fontWeight:600}}>📋 Conference Pitch Capture</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-              {NOTE_FIELDS.map(({key,label,placeholder})=>(
-                <div key={key} style={{gridColumn:key==="notePitchSummary"||key==="noteRedFlags"||key==="noteFollowUp"?"1/-1":"auto"}}>
-                  <label style={{...css.label,color:"#7799aa"}}>{label}</label>
-                  <textarea value={form[key]||""} onChange={e=>set(key,e.target.value)}
-                    rows={key==="notePitchSummary"?3:2}
-                    placeholder={placeholder}
-                    style={{...css.input,resize:"vertical",fontSize:13,padding:"8px 10px"}}/>
-                </div>
-              ))}
-            </div>
-          </div>
-          {/* Free-form additional notes */}
-          <label style={css.label}>Additional Notes</label>
-          <textarea value={form.notes} onChange={e=>set("notes",e.target.value)} rows={3}
-            placeholder="Any other observations, booth context, or follow-up thoughts..."
-            style={{...css.input,resize:"vertical",fontSize:14}}/>
+          <label style={css.label}>Add Note</label>
+          <textarea value={form.notes} onChange={e=>set("notes",e.target.value)} rows={4}
+            placeholder="Key differentiators, concerns, booth conversation notes..."
+            style={{...css.input,resize:"vertical",fontSize:15}}/>
           {(form.noteHistory||[]).length>0&&(
             <div style={{marginTop:16}}>
               <div style={{fontSize:11,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Note History</div>
@@ -924,280 +838,16 @@ function BoardSummary({vendors}) {
   );
 }
 
-
-// ─── Folder View ──────────────────────────────────────────────────────────────
-
-function FolderView({folders,vendors,onCreateFolder,onDeleteFolder,onEditFolder,onOpenFolder,onAddVendorToFolder}) {
-  const [newName,setNewName]=useState("");
-  const [newDesc,setNewDesc]=useState("");
-  const [editingId,setEditingId]=useState(null);
-  const [editName,setEditName]=useState("");
-  const [editDesc,setEditDesc]=useState("");
-
-  const create=()=>{
-    if(!newName.trim())return;
-    onCreateFolder({id:Date.now(),name:newName.trim(),description:newDesc.trim(),createdAt:new Date().toISOString()});
-    setNewName("");setNewDesc("");
-  };
-
-  return (
-    <div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
-        <div>
-          <h2 style={{color:"#fff",fontFamily:"Georgia,serif",margin:"0 0 4px"}}>Problem Folders</h2>
-          <div style={{fontSize:13,color:"#445"}}>Group fintechs by the problem they solve. Compare and present findings per folder.</div>
-        </div>
-      </div>
-
-      {/* Create new folder */}
-      <div style={{...css.card,marginBottom:24,border:"1px dashed rgba(0,212,170,0.3)",background:"rgba(0,212,170,0.03)"}}>
-        <div style={{fontSize:12,color:"#00d4aa",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:12,fontWeight:600}}>+ Create New Folder</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-          <div style={{gridColumn:"1/-1"}}>
-            <label style={css.label}>Folder Name *</label>
-            <input value={newName} onChange={e=>setNewName(e.target.value)}
-              onKeyDown={e=>{if(e.key==="Enter")create();}}
-              placeholder="e.g. Membership Growth, Fraud Detection, Digital Lending..."
-              style={{...css.input,fontSize:15}}/>
-          </div>
-          <div style={{gridColumn:"1/-1"}}>
-            <label style={css.label}>Description (optional)</label>
-            <input value={newDesc} onChange={e=>setNewDesc(e.target.value)}
-              placeholder="What problem are you solving? What are you comparing these fintechs on?"
-              style={css.input}/>
-          </div>
-        </div>
-        <button onClick={create} style={{marginTop:12,padding:"10px 20px",background:"#00d4aa",border:"none",borderRadius:8,color:"#000",fontWeight:700,cursor:"pointer",fontSize:14,minHeight:44}}>Create Folder</button>
-      </div>
-
-      {/* Folder grid */}
-      {folders.length===0?(
-        <div style={{textAlign:"center",padding:60,color:"#334"}}>
-          <div style={{fontSize:40,marginBottom:12}}>📁</div>
-          <div style={{fontSize:16,color:"#556"}}>No folders yet</div>
-          <div style={{fontSize:13,color:"#334",marginTop:6}}>Create a folder above to start organizing fintechs by the problem they solve.</div>
-        </div>
-      ):(
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:16}}>
-          {folders.map(folder=>{
-            const folderVendors=vendors.filter(v=>v.folderId===folder.id||String(v.folderId)===String(folder.id));
-            const avgScore=folderVendors.length?(folderVendors.reduce((s,v)=>s+(v.effortAdj||0),0)/folderVendors.length).toFixed(2):"—";
-            const topVendor=folderVendors.length?[...folderVendors].sort((a,b)=>(b.effortAdj||0)-(a.effortAdj||0))[0]:null;
-            return (
-              <div key={folder.id} style={{...css.card,cursor:"pointer",transition:"border-color 0.2s",border:"1px solid rgba(0,212,170,0.15)"}}
-                onClick={()=>onOpenFolder(folder.id)}>
-                {editingId===folder.id?(
-                  <div onClick={e=>e.stopPropagation()}>
-                    <input value={editName} onChange={e=>setEditName(e.target.value)}
-                      style={{...css.input,marginBottom:8,fontSize:15}}/>
-                    <input value={editDesc} onChange={e=>setEditDesc(e.target.value)}
-                      style={{...css.input,marginBottom:10,fontSize:13}}/>
-                    <div style={{display:"flex",gap:8}}>
-                      <button onClick={()=>{onEditFolder(folder.id,editName,editDesc);setEditingId(null);}}
-                        style={{padding:"6px 14px",background:"#00d4aa",border:"none",borderRadius:6,color:"#000",fontWeight:700,cursor:"pointer",fontSize:13}}>Save</button>
-                      <button onClick={()=>setEditingId(null)}
-                        style={{padding:"6px 14px",background:"none",border:"1px solid rgba(255,255,255,0.15)",borderRadius:6,color:"#889",cursor:"pointer",fontSize:13}}>Cancel</button>
-                    </div>
-                  </div>
-                ):(
-                  <>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
-                      <div style={{fontSize:18,marginRight:8}}>📁</div>
-                      <div style={{display:"flex",gap:6}}>
-                        <button onClick={e=>{e.stopPropagation();setEditingId(folder.id);setEditName(folder.name);setEditDesc(folder.description||"");}}
-                          style={{background:"none",border:"none",color:"#445",cursor:"pointer",fontSize:14,padding:"2px 6px"}}>✎</button>
-                        <button onClick={e=>{e.stopPropagation();if(window.confirm(`Delete folder "${folder.name}"? Vendors inside will not be deleted.`))onDeleteFolder(folder.id);}}
-                          style={{background:"none",border:"none",color:"#446",cursor:"pointer",fontSize:14,padding:"2px 6px"}}>✕</button>
-                      </div>
-                    </div>
-                    <div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:4}}>{folder.name}</div>
-                    {folder.description&&<div style={{fontSize:12,color:"#556",marginBottom:10}}>{folder.description}</div>}
-                    <div style={{display:"flex",gap:14,marginTop:8,paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
-                      <div style={{textAlign:"center"}}>
-                        <div style={{fontSize:20,fontWeight:700,color:"#00d4aa"}}>{folderVendors.length}</div>
-                        <div style={{fontSize:10,color:"#445"}}>Vendors</div>
-                      </div>
-                      <div style={{textAlign:"center"}}>
-                        <div style={{fontSize:20,fontWeight:700,color:"#4db8ff"}}>{avgScore}</div>
-                        <div style={{fontSize:10,color:"#445"}}>Avg Score</div>
-                      </div>
-                      {topVendor&&(
-                        <div style={{flex:1,textAlign:"right"}}>
-                          <div style={{fontSize:11,color:"#445"}}>Top Pick</div>
-                          <div style={{fontSize:13,color:"#fff",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{topVendor.fintechName}</div>
-                          <div style={{fontSize:11,color:"#00d4aa"}}>{(topVendor.effortAdj||0).toFixed(2)}</div>
-                        </div>
-                      )}
-                    </div>
-                    <button onClick={e=>{e.stopPropagation();onOpenFolder(folder.id);}}
-                      style={{marginTop:12,width:"100%",padding:"8px",background:"rgba(0,212,170,0.1)",border:"1px solid rgba(0,212,170,0.2)",borderRadius:6,color:"#00d4aa",cursor:"pointer",fontSize:13,fontWeight:600}}>
-                      Open Folder →
-                    </button>
-                  </>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Folder Detail View ────────────────────────────────────────────────────────
-
-function FolderDetailView({folder,vendors,onBack,onEditVendor,weights,weightLabels,mustHaves}) {
-  const [sortBy,setSortBy]=useState("effortAdj");
-  const folderVendors=vendors.filter(v=>v.folderId===folder.id||String(v.folderId)===String(folder.id));
-  const sorted=[...folderVendors].sort((a,b)=>(b[sortBy]||0)-(a[sortBy]||0));
-  const pColor={High:"#ff6b6b",Medium:"#ffd93d",Low:"#6bcb77"};
-
-  // Build comparison table using the union of all criteria across vendors in this folder
-  const allCriteriaKeys=[...new Set(folderVendors.flatMap(v=>Object.keys(v.vendorWeights||weights)))];
-  const allCriteriaLabels=Object.assign({},...folderVendors.map(v=>v.vendorWeightLabels||weightLabels));
-
-  return (
-    <div>
-      {/* Header */}
-      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}>
-        <button onClick={onBack} style={{padding:"8px 14px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,color:"#889",cursor:"pointer",fontSize:13}}>← Back</button>
-        <div>
-          <h2 style={{color:"#fff",fontFamily:"Georgia,serif",margin:"0 0 2px"}}>📁 {folder.name}</h2>
-          {folder.description&&<div style={{fontSize:13,color:"#445"}}>{folder.description}</div>}
-        </div>
-        <div style={{marginLeft:"auto",fontSize:13,color:"#445"}}>{folderVendors.length} vendors</div>
-      </div>
-
-      {folderVendors.length===0?(
-        <div style={{...css.card,textAlign:"center",padding:60}}>
-          <div style={{fontSize:36,marginBottom:12}}>📭</div>
-          <div style={{fontSize:15,color:"#556"}}>No vendors in this folder yet</div>
-          <div style={{fontSize:13,color:"#334",marginTop:6}}>Log a fintech and assign it to this folder from the Basic tab.</div>
-        </div>
-      ):(
-        <>
-          {/* Score Summary Cards */}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:12,marginBottom:24}}>
-            {sorted.map((v,i)=>{
-              const grade=getGrade(v.effortAdj||0);
-              return (
-                <div key={v.id} style={{...css.card,border:`1px solid ${i===0?"rgba(0,212,170,0.3)":"rgba(255,255,255,0.07)"}`,background:i===0?"rgba(0,212,170,0.05)":"rgba(255,255,255,0.03)"}}>
-                  {i===0&&<div style={{fontSize:10,color:"#00d4aa",fontWeight:700,marginBottom:4,textTransform:"uppercase",letterSpacing:"0.08em"}}>🏆 Top Pick</div>}
-                  <div style={{fontSize:14,fontWeight:700,color:"#fff",marginBottom:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{v.fintechName}</div>
-                  <div style={{fontSize:22,fontWeight:700,color:"#00d4aa"}}>{(v.effortAdj||0).toFixed(2)}</div>
-                  <span style={{padding:"2px 8px",borderRadius:4,background:`${grade.color}22`,color:grade.color,fontSize:12,fontWeight:700}}>{grade.grade}</span>
-                  <div style={{fontSize:11,color:v.mustHave?"#2ecc71":"#e74c3c",marginTop:6}}>{v.mustHave?"✓ Must-Haves":"✗ Must-Haves"}</div>
-                  <button onClick={()=>onEditVendor(v)} style={{marginTop:8,width:"100%",padding:"5px",background:"rgba(77,184,255,0.1)",border:"1px solid rgba(77,184,255,0.2)",borderRadius:6,color:"#4db8ff",fontSize:12,cursor:"pointer"}}>Edit / Notes</button>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Head-to-head comparison table */}
-          <div style={{...css.card,marginBottom:24,overflowX:"auto"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-              <h3 style={{margin:0,fontSize:13,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.1em"}}>Head-to-Head Comparison</h3>
-              <select value={sortBy} onChange={e=>setSortBy(e.target.value)} style={{...{background:"#0f1923",border:"1px solid rgba(255,255,255,0.1)",borderRadius:6,padding:"6px 10px",color:"#fff",fontSize:12}}}>
-                <option value="effortAdj">Sort: Effort Adj</option>
-                <option value="weighted">Sort: Weighted</option>
-              </select>
-            </div>
-            <table style={{width:"100%",borderCollapse:"collapse",minWidth:500}}>
-              <thead>
-                <tr style={{borderBottom:"1px solid rgba(255,255,255,0.08)"}}>
-                  <th style={{textAlign:"left",padding:"8px 10px",fontSize:11,color:"#446",textTransform:"uppercase"}}>Criteria</th>
-                  {sorted.map(v=>(
-                    <th key={v.id} style={{textAlign:"center",padding:"8px 10px",fontSize:13,color:"#fff",fontWeight:700,minWidth:100}}>
-                      {v.fintechName}
-                      <div style={{fontSize:10,color:"#556",fontWeight:400}}>{(v.effortAdj||0).toFixed(2)}</div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {/* Score rows */}
-                {allCriteriaKeys.map(k=>{
-                  const vals=sorted.map(v=>v[k]||0);
-                  const best=Math.max(...vals);
-                  return (
-                    <tr key={k} style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
-                      <td style={{padding:"8px 10px",fontSize:12,color:"#8899aa"}}>{allCriteriaLabels[k]||k}</td>
-                      {sorted.map((v,i)=>{
-                        const val=v[k]||0;
-                        const isBest=val===best&&best>0;
-                        return (
-                          <td key={v.id} style={{textAlign:"center",padding:"8px 10px"}}>
-                            <span style={{fontSize:14,fontWeight:700,color:val>=4?"#00d4aa":val>=3?"#ffd93d":"#e74c3c",background:isBest?"rgba(0,212,170,0.1)":"transparent",padding:"2px 8px",borderRadius:4}}>{val}</span>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
-                {/* Effort row */}
-                <tr style={{borderBottom:"1px solid rgba(255,255,255,0.04)",background:"rgba(255,255,255,0.02)"}}>
-                  <td style={{padding:"8px 10px",fontSize:12,color:"#8899aa"}}>Implementation Effort</td>
-                  {sorted.map(v=>{
-                    const val=v.implementationEffort||3;
-                    const best=Math.min(...sorted.map(x=>x.implementationEffort||3));
-                    return <td key={v.id} style={{textAlign:"center",padding:"8px 10px"}}><span style={{fontSize:14,fontWeight:700,color:val<=2?"#00d4aa":val<=3?"#ffd93d":"#e74c3c",background:val===best?"rgba(0,212,170,0.1)":"transparent",padding:"2px 8px",borderRadius:4}}>{val}</span></td>;
-                  })}
-                </tr>
-                {/* Final score row */}
-                <tr style={{borderTop:"2px solid rgba(255,255,255,0.1)",background:"rgba(0,212,170,0.04)"}}>
-                  <td style={{padding:"10px 10px",fontSize:13,color:"#fff",fontWeight:700}}>Effort-Adj Score</td>
-                  {sorted.map((v,i)=>(
-                    <td key={v.id} style={{textAlign:"center",padding:"10px 10px"}}>
-                      <div style={{fontSize:16,fontWeight:700,color:i===0?"#00d4aa":"#4db8ff"}}>{(v.effortAdj||0).toFixed(2)}</div>
-                      <span style={{padding:"1px 7px",borderRadius:4,background:`${getGrade(v.effortAdj||0).color}22`,color:getGrade(v.effortAdj||0).color,fontSize:11,fontWeight:700}}>{getGrade(v.effortAdj||0).grade}</span>
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* Notes comparison */}
-          <div style={css.card}>
-            <h3 style={{margin:"0 0 16px",fontSize:13,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.1em"}}>Conference Notes Comparison</h3>
-            {NOTE_FIELDS.map(({key,label})=>{
-              const hasAny=sorted.some(v=>v[key]&&v[key].trim());
-              if(!hasAny)return null;
-              return (
-                <div key={key} style={{marginBottom:16,paddingBottom:16,borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
-                  <div style={{fontSize:11,color:"#00d4aa",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8,fontWeight:600}}>{label}</div>
-                  <div style={{display:"grid",gridTemplateColumns:`repeat(${sorted.length},1fr)`,gap:10}}>
-                    {sorted.map(v=>(
-                      <div key={v.id}>
-                        <div style={{fontSize:11,color:"#556",marginBottom:3,fontWeight:600}}>{v.fintechName}</div>
-                        <div style={{fontSize:13,color:v[key]?"#c8d8e8":"#334",fontStyle:v[key]?"normal":"italic"}}>
-                          {v[key]||"Not captured"}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
 export default function App() {
   const [vendors,setVendors]=useState([]);
-  const [folders,setFolders]=useState([]);
   const [departments,setDepartments]=useState(DEFAULT_DEPARTMENTS);
   const [conferences,setConferences]=useState(DEFAULT_CONFERENCES);
   const [weights,setWeights]=useState(DEFAULT_WEIGHTS);
   const [weightLabels,setWeightLabels]=useState(DEFAULT_WEIGHT_LABELS);
   const [mustHaves,setMustHaves]=useState(DEFAULT_MUST_HAVES);
   const [view,setView]=useState("dashboard");
-  const [activeFolderId,setActiveFolderId]=useState(null);
   const [showForm,setShowForm]=useState(false);
   const [quickMode,setQuickMode]=useState(false);
   const [editItem,setEditItem]=useState(null);
@@ -1230,8 +880,8 @@ export default function App() {
           if (row.key === "conferences") setConferences(row.value);
           if (row.key === "weights") setWeights(row.value);
           if (row.key === "mustHaves") setMustHaves(row.value);
+        if (row.key === "weightLabels") setWeightLabels(row.value);
           if (row.key === "weightLabels") setWeightLabels(row.value);
-          if (row.key === "folders") setFolders(row.value||[]);
         });
         setSaveStatus("saved");
       } catch(e) { setSaveStatus("error"); }
@@ -1283,21 +933,12 @@ export default function App() {
   const addDepartment=d=>setDepartments(p=>{const n=p.includes(d)?p:[...p,d];persistConfig("departments",n);return n;});
   const addConference=c=>setConferences(p=>{const n=p.includes(c)?p:[...p,c];persistConfig("conferences",n);return n;});
 
-  const enriched=useMemo(()=>vendors.map(v=>{
-    // Each vendor uses its own scoring snapshot if it has one, otherwise falls back to current global
-    const vWeights = v.vendorWeights || weights;
-    const vMustHaves = v.vendorMustHaves || mustHaves;
-    const w = calcWeighted(v, vWeights);
-    return {
-      ...v,
-      weighted: w,
-      effortAdj: calcEffortAdjusted(w, v.implementationEffort),
-      mustHave: meetsMustHaves(v, vMustHaves),
-      _weights: vWeights,
-      _weightLabels: v.vendorWeightLabels || weightLabels,
-      _mustHaves: vMustHaves,
-    };
-  }).sort((a,b)=>b[sortBy]-a[sortBy]).map((v,i)=>({...v,rank:i+1})),[vendors,weights,weightLabels,mustHaves,sortBy]);
+  const enriched=useMemo(()=>vendors.map(v=>({
+    ...v,
+    weighted:calcWeighted(v,weights),
+    effortAdj:calcEffortAdjusted(calcWeighted(v,weights),v.implementationEffort),
+    mustHave:meetsMustHaves(v,mustHaves),
+  })).sort((a,b)=>b[sortBy]-a[sortBy]).map((v,i)=>({...v,rank:i+1})),[vendors,weights,mustHaves,sortBy]);
 
   const filtered=useMemo(()=>enriched.filter(v=>
     (filterDept==="All"||(v.departmentFocus||[]).includes(filterDept))&&
@@ -1323,15 +964,7 @@ export default function App() {
   const saveVendor=v=>{
     const dupeCheck=vendors.find(x=>x.id!==v.id&&x.fintechName.toLowerCase()===v.fintechName.toLowerCase());
     if(dupeCheck&&!v.id){setDupeWarning(v);return;}
-    // Snapshot the current global scoring model into the vendor if not already set
-    // On first save: use global defaults. On edit: keep existing snapshot unless user changed it.
-    const vendorWithSnapshot = {
-      ...v,
-      vendorWeights: v.vendorWeights || weights,
-      vendorWeightLabels: v.vendorWeightLabels || weightLabels,
-      vendorMustHaves: v.vendorMustHaves || mustHaves,
-    };
-    const next=vendors.find(x=>x.id===vendorWithSnapshot.id)?vendors.map(x=>x.id===vendorWithSnapshot.id?vendorWithSnapshot:x):[...vendors,vendorWithSnapshot];
+    const next=vendors.find(x=>x.id===v.id)?vendors.map(x=>x.id===v.id?v:x):[...vendors,v];
     setVendors(next);persistVendors(next);
     setShowForm(false);setEditItem(null);setDupeWarning(null);
   };
@@ -1343,11 +976,6 @@ export default function App() {
   };
 
   const handleWeightsChange=w=>{setWeights(w);persistConfig("weights",w);};
-
-  const createFolder=f=>{const next=[...folders,f];setFolders(next);persistConfig("folders",next);};
-  const deleteFolder=id=>{const next=folders.filter(f=>f.id!==id);setFolders(next);persistConfig("folders",next);};
-  const editFolder=(id,name,description)=>{const next=folders.map(f=>f.id===id?{...f,name,description}:f);setFolders(next);persistConfig("folders",next);};
-  const openFolder=id=>{setActiveFolderId(id);setView("folderDetail");};
   const handleWeightLabelsChange=l=>{setWeightLabels(l);persistConfig("weightLabels",l);};
   const handleMustHavesChange=mh=>{setMustHaves(mh);persistConfig("mustHaves",mh);};
 
@@ -1390,7 +1018,6 @@ export default function App() {
         if(d.weights)setWeights(d.weights);
         if(d.mustHaves)setMustHaves(d.mustHaves);
         if(d.weightLabels)setWeightLabels(d.weightLabels);
-        if(d.folders)setFolders(d.folders);
         persist(d.vendors||[],d.departments||DEFAULT_DEPARTMENTS,d.conferences||DEFAULT_CONFERENCES,d.weights||DEFAULT_WEIGHTS,d.mustHaves||DEFAULT_MUST_HAVES).then(()=>setSaveStatus("saved"));
         if(d.weightLabels)persistConfig("weightLabels",d.weightLabels);
         alert(`✓ Restored ${d.vendors?.length||0} vendors successfully.`);
@@ -1401,7 +1028,7 @@ export default function App() {
 
   const s2={background:"#0f1923",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"8px 14px",color:"#fff",fontSize:13};
   const pColor={High:"#ff6b6b",Medium:"#ffd93d",Low:"#6bcb77"};
-  const NAV=[["dashboard","Dashboard"],["list","Vendors"],["folders","Folders"],["trend","Trends"],["board","Board"],["weights","Weights"]];
+  const NAV=[["dashboard","Dashboard"],["list","Vendors"],["trend","Trends"],["board","Board"],["weights","Weights"]];
 
   return (
     <div style={{minHeight:"100vh",background:"#080f18",color:"#c8d8e8",fontFamily:"'Segoe UI',sans-serif"}}>
@@ -1514,7 +1141,7 @@ export default function App() {
             <h3 style={{margin:"0 0 14px",fontSize:13,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.1em"}}>Data Management</h3>
             <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
               <button onClick={()=>exportCSV(enriched,weights)} style={{padding:"10px 16px",background:"rgba(0,212,170,0.1)",border:"1px solid rgba(0,212,170,0.2)",borderRadius:8,color:"#00d4aa",cursor:"pointer",fontSize:13,minHeight:44}}>📥 Export CSV</button>
-              <button onClick={()=>exportJSON({vendors,folders,departments,conferences,weights,weightLabels,mustHaves})} style={{padding:"10px 16px",background:"rgba(77,184,255,0.1)",border:"1px solid rgba(77,184,255,0.2)",borderRadius:8,color:"#4db8ff",cursor:"pointer",fontSize:13,minHeight:44}}>💾 Backup JSON</button>
+              <button onClick={()=>exportJSON({vendors,departments,conferences,weights,weightLabels,mustHaves})} style={{padding:"10px 16px",background:"rgba(77,184,255,0.1)",border:"1px solid rgba(77,184,255,0.2)",borderRadius:8,color:"#4db8ff",cursor:"pointer",fontSize:13,minHeight:44}}>💾 Backup JSON</button>
               <button onClick={()=>fileInputRef.current?.click()} style={{padding:"10px 16px",background:"rgba(255,215,61,0.1)",border:"1px solid rgba(255,215,61,0.2)",borderRadius:8,color:"#ffd93d",cursor:"pointer",fontSize:13,minHeight:44}}>📤 Restore JSON</button>
               <button onClick={()=>setShowImport(true)} style={{padding:"10px 16px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,color:"#889",cursor:"pointer",fontSize:13,minHeight:44}}>📋 Import CSV</button>
               <input ref={fileInputRef} type="file" accept=".json" onChange={handleRestoreJSON} style={{display:"none"}}/>
@@ -1588,10 +1215,7 @@ export default function App() {
                       <span>{(v.departmentFocus||[]).join(", ")}</span>
                       {v.conference&&<span>· {v.conference}</span>}
                     </div>
-                    <div style={{display:"flex",gap:8,alignItems:"center",marginTop:2,fontSize:11}}>
-                      <span style={{color:v.vendorWeights?"#4488aa":"#334"}}>{v.vendorWeights?"📌 Own model":"📋 Global model"}</span>
-                      {v.notes&&<span style={{color:"#445",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:300}}>· {v.notes}</span>}
-                    </div>
+                    {v.notes&&<div style={{fontSize:11,color:"#445",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:360}}>{v.notes}</div>}
                   </div>
                   <div style={{textAlign:"right"}}>
                     <div style={{fontSize:17,fontWeight:700,color:"#00d4aa"}}>{(v.effortAdj||0).toFixed(2)}</div>
@@ -1618,8 +1242,6 @@ export default function App() {
         {view==="trend"&&<TrendAnalysis vendors={enriched}/>}
         {view==="board"&&<BoardSummary vendors={enriched}/>}
         {view==="weights"&&<WeightsEditor weights={weights} weightLabels={weightLabels} onChange={handleWeightsChange} onLabelsChange={handleWeightLabelsChange} mustHaves={mustHaves} onMustHavesChange={handleMustHavesChange}/>}
-        {view==="folders"&&<FolderView folders={folders} vendors={enriched} onCreateFolder={createFolder} onDeleteFolder={deleteFolder} onEditFolder={editFolder} onOpenFolder={openFolder} />}
-        {view==="folderDetail"&&(()=>{const f=folders.find(x=>x.id===activeFolderId||String(x.id)===String(activeFolderId));return f?<FolderDetailView folder={f} vendors={enriched} onBack={()=>setView("folders")} onEditVendor={v=>{setEditItem(v);setQuickMode(false);setShowForm(true);}} weights={weights} weightLabels={weightLabels} mustHaves={mustHaves}/>:<div style={{color:"#556",padding:40}}>Folder not found.</div>;})()}
       </div>
 
       {/* Swipe Mode */}
@@ -1658,7 +1280,7 @@ export default function App() {
           <EntryForm initial={editItem} onSave={saveVendor} onClose={()=>{setShowForm(false);setEditItem(null);}}
             departments={departments} conferences={conferences}
             onAddDepartment={addDepartment} onAddConference={addConference}
-            weights={weights} weightLabels={weightLabels} mustHaves={mustHaves} folders={folders} quickMode={quickMode}/>
+            weights={weights} weightLabels={weightLabels} mustHaves={mustHaves} quickMode={quickMode}/>
         </Modal>
       )}
 
@@ -1671,7 +1293,7 @@ export default function App() {
             <p style={{color:"#889",marginBottom:24}}>A vendor named "<strong style={{color:"#fff"}}>{dupeWarning.fintechName}</strong>" already exists. Save anyway?</p>
             <div style={{display:"flex",gap:10,justifyContent:"center"}}>
               <button onClick={()=>setDupeWarning(null)} style={{padding:"12px 20px",background:"none",border:"1px solid rgba(255,255,255,0.15)",color:"#889",borderRadius:6,cursor:"pointer",minHeight:48}}>Cancel</button>
-              <button onClick={()=>{const snap={...dupeWarning,id:Date.now(),vendorWeights:dupeWarning.vendorWeights||weights,vendorWeightLabels:dupeWarning.vendorWeightLabels||weightLabels,vendorMustHaves:dupeWarning.vendorMustHaves||mustHaves};const next=[...vendors,snap];setVendors(next);persistVendors(next);setShowForm(false);setDupeWarning(null);}}
+              <button onClick={()=>{const next=[...vendors,{...dupeWarning,id:Date.now()}];setVendors(next);persistVendors(next);setShowForm(false);setDupeWarning(null);}}
                 style={{padding:"12px 20px",background:"#ffd93d",border:"none",color:"#000",borderRadius:6,cursor:"pointer",fontWeight:700,minHeight:48}}>Save Anyway</button>
             </div>
           </div>
