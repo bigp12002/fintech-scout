@@ -551,102 +551,23 @@ function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartme
   const [tab,setTab]=useState("basic");
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
 
-  // ── Autosave ──
-  const [autoSaveStatus,setAutoSaveStatus]=useState("idle"); // idle | pending | saved | error
-  const autoSaveTimer=useRef(null);
-  const lastSavedForm=useRef(initial||null);
-  const formRef=useRef(form);
-  formRef.current=form;
-
-  // Trigger autosave 10s after any form change (only if name is set)
-  useEffect(()=>{
-    if(!form.fintechName) return; // nothing to save yet
-    setAutoSaveStatus("pending");
-    if(autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    autoSaveTimer.current=setTimeout(()=>{
-      const f=formRef.current;
-      if(!f.fintechName) return;
-      const noteHistory=f.notes&&f.notes!==lastSavedForm.current?.notes
-        ?[...(f.noteHistory||[]),{text:f.notes,ts:Date.now()}]
-        :(f.noteHistory||[]);
-      const toSave={...f,id:f.id||Date.now(),noteHistory};
-      try{
-        onSave(toSave,true); // second arg = isAutoSave (won't close the form)
-        lastSavedForm.current=toSave;
-        setAutoSaveStatus("saved");
-        // Update form id in case it was just created
-        setForm(prev=>prev.id?prev:{...prev,id:toSave.id});
-        setTimeout(()=>setAutoSaveStatus("idle"),3000);
-      }catch(e){
-        setAutoSaveStatus("error");
-      }
-    },10000);
-    return()=>{if(autoSaveTimer.current)clearTimeout(autoSaveTimer.current);};
-  },[form]);
-
-  // Inline label editing state
-  const [vendorEditingLabel,setVendorEditingLabel]=useState(null);
-  const [vendorEditingLabelVal,setVendorEditingLabelVal]=useState("");
-  const [newVendorCriteria,setNewVendorCriteria]=useState("");
-
-  // Use the vendor's own scoring snapshot if set, else fall back to global
+  // Use the vendor's own scoring snapshot if editing an existing vendor, else use global
   const activeWeights = form.vendorWeights || weights;
   const activeWeightLabels = form.vendorWeightLabels || weightLabels;
   const activeMustHaves = form.vendorMustHaves || mustHaves;
 
-  // When user edits weights inline, store into vendorWeights (creates snapshot)
-  const updateVendorWeight = (k, val) => {
-    const updated = {...activeWeights, [k]: Math.max(0, Math.min(100, Number(val)||0))};
-    setForm(f=>({...f, vendorWeights: updated}));
-  };
+  const resetToGlobal = () => setForm(f=>({
+    ...f,
+    vendorWeights: null,
+    vendorWeightLabels: null,
+    vendorMustHaves: null,
+    // re-init scores for new global keys
+    ...Object.keys(weights).reduce((acc,k)=>({...acc,[k]:f[k]||3}),{}),
+  }));
 
-  const updateVendorMustHave = (k, val) => {
-    const updated = {...activeMustHaves, [k]: val};
-    setForm(f=>({...f, vendorMustHaves: updated}));
-  };
-
-  const commitVendorLabel = (k) => {
-    if (vendorEditingLabelVal.trim()) {
-      const updated = {...activeWeightLabels, [k]: vendorEditingLabelVal.trim()};
-      setForm(f=>({...f, vendorWeightLabels: updated}));
-    }
-    setVendorEditingLabel(null);
-  };
-
-  const addVendorCriteria = () => {
-    const name = newVendorCriteria.trim();
-    if (!name) return;
-    const key = "custom_" + name.toLowerCase().replace(/[^a-z0-9]/g,"_") + "_" + Date.now();
-    setForm(f=>({
-      ...f,
-      [key]: 3,
-      vendorWeights: {...activeWeights, [key]: 0},
-      vendorWeightLabels: {...activeWeightLabels, [key]: name},
-      vendorMustHaves: {...activeMustHaves, [key]: 1},
-    }));
-    setNewVendorCriteria("");
-  };
-
-  const deleteVendorCriteria = (k) => {
-    const w={...activeWeights}; const l={...activeWeightLabels}; const m={...activeMustHaves};
-    delete w[k]; delete l[k]; delete m[k];
-    setForm(f=>{const nf={...f, vendorWeights:w, vendorWeightLabels:l, vendorMustHaves:m}; delete nf[k]; return nf;});
-  };
-
-  const resetToGlobal = () => {
-    setForm(f=>({
-      ...f,
-      vendorWeights: null,
-      vendorWeightLabels: null,
-      vendorMustHaves: null,
-      ...Object.keys(weights).reduce((acc,k)=>({...acc,[k]:f[k]||3}),{}),
-    }));
-    setVendorEditingLabel(null);
-  };
-
-  const weighted=calcWeighted(form, activeWeights);
+  const weighted=calcWeighted(form,activeWeights);
   const effortAdj=calcEffortAdjusted(weighted,form.implementationEffort);
-  const mustHave=meetsMustHaves(form, activeMustHaves);
+  const mustHave=meetsMustHaves(form,activeMustHaves);
   const grade=getGrade(effortAdj);
   const tabs=quickMode?["basic","scores"]:["basic","scores","reference","notes"];
 
@@ -730,124 +651,28 @@ function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartme
 
       {tab==="scores"&&(
         <div>
-          {/* Model status banner */}
+          {/* Scoring model info banner */}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,padding:"10px 14px",background:"rgba(0,212,170,0.05)",borderRadius:8,border:"1px solid rgba(0,212,170,0.12)"}}>
             <div>
               <div style={{fontSize:12,color:"#00d4aa",fontWeight:600}}>
-                {form.vendorWeights ? "📌 This vendor has its own scoring model" : "📋 Using global scoring model — edits apply to this vendor only"}
+                {form.vendorWeights ? "📌 Using this vendor's saved scoring model" : "📋 Using current global scoring model (default)"}
               </div>
               <div style={{fontSize:11,color:"#445",marginTop:2}}>
-                Rename criteria, adjust weights, set must-haves, or add/remove fields. Changes are saved with this vendor only and do not affect the global model.
+                {form.vendorWeights ? "Scores are based on the model active when this vendor was first saved." : "This model will be snapshotted and saved with this vendor."}
               </div>
             </div>
             {form.vendorWeights && (
-              <button onClick={resetToGlobal} style={{padding:"6px 12px",background:"rgba(255,215,61,0.1)",border:"1px solid rgba(255,215,61,0.3)",borderRadius:6,color:"#ffd93d",cursor:"pointer",fontSize:12,whiteSpace:"nowrap",marginLeft:12,flexShrink:0}}>↺ Reset to Global</button>
+              <button onClick={resetToGlobal} style={{padding:"6px 12px",background:"rgba(255,215,61,0.1)",border:"1px solid rgba(255,215,61,0.3)",borderRadius:6,color:"#ffd93d",cursor:"pointer",fontSize:12,whiteSpace:"nowrap",marginLeft:12}}>↺ Reset to Global</button>
             )}
           </div>
-
-          {/* Inline weight total indicator */}
-          {(()=>{
-            const tot=Object.values(activeWeights).reduce((s,w)=>s+Number(w),0);
-            return (
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,padding:"6px 10px",background:Math.abs(tot-100)<1?"rgba(0,212,170,0.06)":"rgba(231,76,60,0.06)",borderRadius:6,border:`1px solid ${Math.abs(tot-100)<1?"rgba(0,212,170,0.2)":"rgba(231,76,60,0.2)"}`}}>
-                <span style={{fontSize:12,color:Math.abs(tot-100)<1?"#00d4aa":"#e74c3c",fontWeight:600}}>
-                  {Math.abs(tot-100)<1?"✓ Weights total 100%":`⚠ Weights total ${tot}% — must equal 100%`}
-                </span>
-                <span style={{fontSize:11,color:"#445"}}>Scoring criteria: {Object.keys(activeWeights).length}</span>
-              </div>
-            );
-          })()}
-
-          {/* Column headers */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 72px 60px 72px 32px",gap:6,marginBottom:6,padding:"0 6px"}}>
-            {["Criteria Name","Rating (1–5)","Weight %","Slider","Must-Have",""].map(h=>(
-              <div key={h} style={{fontSize:9,color:"#445",textTransform:"uppercase",letterSpacing:"0.07em"}}>{h}</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 24px"}}>
+            {Object.keys(activeWeights).map(k=>(
+              <RatingInput key={k} label={`${(activeWeightLabels||{})[k]||k} (${activeWeights[k]}%)`}
+                value={form[k]||3} onChange={v=>set(k,v)}
+                highlight={activeMustHaves[k]>1}
+                hint={activeMustHaves[k]>1?`Must-Have: ≥${activeMustHaves[k]} required`:null}/>
             ))}
-          </div>
-
-          {/* Criteria rows — label editable + rating + weight + slider + must-have + delete */}
-          {Object.keys(activeWeights).map(k=>{
-            const isEditingLabel = vendorEditingLabel===k;
-            return (
-              <div key={k} style={{display:"grid",gridTemplateColumns:"1fr 1fr 72px 60px 72px 32px",gap:6,alignItems:"center",marginBottom:8,padding:"8px 8px",background:"rgba(255,255,255,0.03)",borderRadius:8,border:"1px solid rgba(255,255,255,0.06)"}}>
-
-                {/* Editable label */}
-                <div>
-                  {isEditingLabel ? (
-                    <input autoFocus value={vendorEditingLabelVal}
-                      onChange={e=>setVendorEditingLabelVal(e.target.value)}
-                      onBlur={()=>commitVendorLabel(k)}
-                      onKeyDown={e=>{if(e.key==="Enter")commitVendorLabel(k);if(e.key==="Escape")setVendorEditingLabel(null);}}
-                      style={{...css.input,fontSize:12,padding:"4px 8px",border:"1px solid rgba(0,212,170,0.5)"}}/>
-                  ) : (
-                    <div style={{display:"flex",alignItems:"center",gap:4}}>
-                      <span style={{fontSize:13,color:"#c8d8e8",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{(activeWeightLabels||{})[k]||k}</span>
-                      <button onClick={()=>{setVendorEditingLabel(k);setVendorEditingLabelVal((activeWeightLabels||{})[k]||k);}}
-                        style={{background:"none",border:"none",color:"#445",cursor:"pointer",fontSize:11,padding:"2px",flexShrink:0}} title="Rename">✎</button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Rating 1–5 buttons */}
-                <div style={{display:"flex",gap:3}}>
-                  {[1,2,3,4,5].map(n=>(
-                    <button key={n} onClick={()=>set(k,n)} style={{
-                      flex:1,padding:"5px 0",border:"1px solid",fontSize:12,cursor:"pointer",borderRadius:4,
-                      borderColor:form[k]===n||(!form[k]&&n===3)?"#00d4aa":"rgba(255,255,255,0.1)",
-                      background:form[k]===n||(!form[k]&&n===3)?"rgba(0,212,170,0.15)":"rgba(255,255,255,0.03)",
-                      color:form[k]===n||(!form[k]&&n===3)?"#00d4aa":"#667",
-                      fontWeight:form[k]===n||(!form[k]&&n===3)?700:400,
-                      minHeight:36,touchAction:"manipulation",
-                    }}>{n}</button>
-                  ))}
-                </div>
-
-                {/* Weight % */}
-                <div style={{display:"flex",alignItems:"center",gap:2}}>
-                  <input type="number" min="0" max="100"
-                    value={activeWeights[k]||0}
-                    onChange={e=>updateVendorWeight(k,e.target.value)}
-                    style={{width:44,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:4,padding:"4px 4px",color:"#00d4aa",fontSize:12,fontWeight:700,textAlign:"center"}}/>
-                  <span style={{fontSize:10,color:"#445"}}>%</span>
-                </div>
-
-                {/* Slider */}
-                <input type="range" min="0" max="50" value={activeWeights[k]||0}
-                  onChange={e=>updateVendorWeight(k,e.target.value)}
-                  style={{width:"100%",accentColor:"#00d4aa",cursor:"pointer"}}/>
-
-                {/* Must-Have */}
-                <select value={activeMustHaves[k]||1}
-                  onChange={e=>updateVendorMustHave(k,Number(e.target.value))}
-                  style={{...css.selectDark,padding:"4px 4px",fontSize:11,color:activeMustHaves[k]>1?"#ffd93d":"#445",width:"100%"}}>
-                  <option value={1}>Off</option>
-                  {[2,3,4,5].map(n=><option key={n} value={n}>≥{n}</option>)}
-                </select>
-
-                {/* Delete */}
-                <button onClick={()=>deleteVendorCriteria(k)}
-                  style={{background:"rgba(231,76,60,0.1)",border:"1px solid rgba(231,76,60,0.2)",borderRadius:6,color:"#e74c3c",cursor:"pointer",fontSize:13,width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
-              </div>
-            );
-          })}
-
-          {/* Implementation Effort — always present, not part of weights */}
-          <div style={{marginTop:4,marginBottom:12,padding:"8px 8px",background:"rgba(255,255,255,0.02)",borderRadius:8,border:"1px solid rgba(255,255,255,0.05)"}}>
-            <RatingInput label="Implementation Effort (1=Easy, 5=Hard)" value={form.implementationEffort} onChange={v=>set("implementationEffort",v)} hint="Higher effort reduces the effort-adjusted score — not part of weighted criteria"/>
-          </div>
-
-          {/* Add new criteria */}
-          <div style={{padding:12,background:"rgba(0,212,170,0.04)",border:"1px dashed rgba(0,212,170,0.2)",borderRadius:8}}>
-            <div style={{fontSize:11,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Add Criteria to This Vendor</div>
-            <div style={{display:"flex",gap:6}}>
-              <input value={newVendorCriteria} onChange={e=>setNewVendorCriteria(e.target.value)}
-                onKeyDown={e=>{if(e.key==="Enter")addVendorCriteria();}}
-                placeholder="e.g. Multilingual Support"
-                style={{...css.input,flex:1,border:"1px solid rgba(0,212,170,0.25)",fontSize:13}}/>
-              <button onClick={addVendorCriteria}
-                style={{padding:"8px 14px",background:"#00d4aa",border:"none",borderRadius:6,color:"#000",fontWeight:700,cursor:"pointer",fontSize:13,whiteSpace:"nowrap",minHeight:44}}>+ Add</button>
-            </div>
-            <div style={{fontSize:10,color:"#334",marginTop:4}}>New criteria are added to this vendor only. To add globally, use the Weights tab.</div>
+            <RatingInput label="Implementation Effort (1=Easy, 5=Hard)" value={form.implementationEffort} onChange={v=>set("implementationEffort",v)} hint="Higher effort penalizes adjusted score"/>
           </div>
         </div>
       )}
@@ -909,57 +734,21 @@ function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartme
         </div>
       )}
 
-      {/* Autosave status bar */}
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:20,paddingTop:14,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          {autoSaveStatus==="pending"&&(
-            <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"#ffd93d"}}>
-              <div style={{width:8,height:8,borderRadius:"50%",background:"#ffd93d",animation:"pulse 1s infinite"}}/>
-              Autosave in ~10s...
-            </div>
-          )}
-          {autoSaveStatus==="saved"&&(
-            <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"#2ecc71"}}>
-              <span>✓</span> Autosaved
-            </div>
-          )}
-          {autoSaveStatus==="error"&&(
-            <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"#e74c3c"}}>
-              <span>⚠</span> Autosave failed — save manually
-            </div>
-          )}
-          {autoSaveStatus==="idle"&&form.fintechName&&(
-            <div style={{fontSize:11,color:"#334"}}>Autosaves 10s after each change</div>
-          )}
-          {!form.fintechName&&(
-            <div style={{fontSize:11,color:"#334"}}>Enter a Fintech Name to enable autosave</div>
-          )}
-        </div>
-        <div style={{display:"flex",gap:10}}>
-          <button onClick={onClose} style={{padding:"12px 20px",background:"none",border:"1px solid rgba(255,255,255,0.15)",color:"#889",borderRadius:8,cursor:"pointer",fontSize:15,minHeight:48}}>
-            {form.id?"Close":"Cancel"}
-          </button>
-          <button onClick={()=>{
-            if(!form.fintechName) return;
-            if(autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-            const noteHistory=form.notes&&form.notes!==lastSavedForm.current?.notes
-              ?[...(form.noteHistory||[]),{text:form.notes,ts:Date.now()}]
-              :(form.noteHistory||[]);
-            const toSave={...form,id:form.id||Date.now(),noteHistory};
-            lastSavedForm.current=toSave;
-            setAutoSaveStatus("saved");
-            setTimeout(()=>setAutoSaveStatus("idle"),3000);
-            onSave(toSave);
-          }} style={{
-            padding:"12px 24px",minHeight:48,
-            background:form.fintechName?"#00d4aa":"#223",
-            border:"none",
-            color:form.fintechName?"#000":"#556",
-            borderRadius:8,cursor:"pointer",fontSize:15,fontWeight:700,
-          }}>{form.id?"Save & Close":"Log & Close"}</button>
-        </div>
+      <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:24,paddingTop:16,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+        <button onClick={onClose} style={{padding:"12px 20px",background:"none",border:"1px solid rgba(255,255,255,0.15)",color:"#889",borderRadius:8,cursor:"pointer",fontSize:15,minHeight:48}}>Cancel</button>
+        <button onClick={()=>{
+          if(!form.fintechName||(form.departmentFocus||[]).length===0)return;
+          const noteHistory=form.notes&&form.notes!==initial?.notes
+            ?[...(form.noteHistory||[]),{text:form.notes,ts:Date.now()}]
+            :(form.noteHistory||[]);
+          onSave({...form,id:form.id||Date.now(),noteHistory});
+        }} style={{
+          padding:"12px 24px",minHeight:48,
+          background:form.fintechName&&(form.departmentFocus||[]).length>0?"#00d4aa":"#223",
+          border:"none",color:form.fintechName&&(form.departmentFocus||[]).length>0?"#000":"#556",
+          borderRadius:8,cursor:"pointer",fontSize:15,fontWeight:700,
+        }}>{form.id?"Save Changes":"Log Fintech"}</button>
       </div>
-      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}`}</style>
     </div>
   );
 }
@@ -1531,25 +1320,20 @@ export default function App() {
     return{dept,count:items.length,avg:items.length?(items.reduce((s,v)=>s+(v.effortAdj||0),0)/items.length).toFixed(2):"—",pass:items.filter(v=>v.mustHave).length};
   }),[enriched,departments]);
 
-  const saveVendor=(v,isAutoSave=false)=>{
-    // Skip dupe check on autosave (vendor already exists in the list from prior save)
-    if(!isAutoSave){
-      const dupeCheck=vendors.find(x=>x.id!==v.id&&x.fintechName.toLowerCase()===v.fintechName.toLowerCase());
-      if(dupeCheck&&!v.id){setDupeWarning(v);return;}
-    }
+  const saveVendor=v=>{
+    const dupeCheck=vendors.find(x=>x.id!==v.id&&x.fintechName.toLowerCase()===v.fintechName.toLowerCase());
+    if(dupeCheck&&!v.id){setDupeWarning(v);return;}
     // Snapshot the current global scoring model into the vendor if not already set
+    // On first save: use global defaults. On edit: keep existing snapshot unless user changed it.
     const vendorWithSnapshot = {
       ...v,
       vendorWeights: v.vendorWeights || weights,
       vendorWeightLabels: v.vendorWeightLabels || weightLabels,
       vendorMustHaves: v.vendorMustHaves || mustHaves,
     };
-    const next=vendors.find(x=>x.id===vendorWithSnapshot.id)
-      ?vendors.map(x=>x.id===vendorWithSnapshot.id?vendorWithSnapshot:x)
-      :[...vendors,vendorWithSnapshot];
+    const next=vendors.find(x=>x.id===vendorWithSnapshot.id)?vendors.map(x=>x.id===vendorWithSnapshot.id?vendorWithSnapshot:x):[...vendors,vendorWithSnapshot];
     setVendors(next);persistVendors(next);
-    // Only close form on manual save, not autosave
-    if(!isAutoSave){setShowForm(false);setEditItem(null);setDupeWarning(null);}
+    setShowForm(false);setEditItem(null);setDupeWarning(null);
   };
 
   const deleteVendor=async id=>{
