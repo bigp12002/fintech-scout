@@ -85,7 +85,7 @@ const EMPTY_FORM = {
   notePitchSummary:"",noteDifferentiator:"",noteCUExperience:"",
   noteIntegration:"",notePricing:"",noteTimeline:"",
   noteDemoQuality:"",noteRedFlags:"",noteFollowUp:"",
-  website:"",notes:"",noteHistory:[],
+  notes:"",noteHistory:[],
   folderId:null,
   // Per-vendor scoring snapshot
   vendorWeights:null,vendorWeightLabels:null,vendorMustHaves:null,
@@ -104,14 +104,14 @@ function meetsMustHaves(f,mustHaves) { return Object.entries(mustHaves).every(([
 function getGrade(score) { return GRADES.find(g=>score>=g.min)||GRADES[GRADES.length-1]; }
 
 function exportCSV(vendors, weights) {
-  const headers = ["Name","Departments","Conference","Date","Int'l","NCUA","Scale","DNA","Alkami","MeridianLink","DeptFit","Effort","Weighted","EffortAdj","Grade","MustHaves","Priority","Stage","NextStep","CUsUsing","AssetSize","Reference","Website","Notes"];
+  const headers = ["Name","Departments","Conference","Date","Int'l","NCUA","Scale","DNA","Alkami","MeridianLink","DeptFit","Effort","Weighted","EffortAdj","Grade","MustHaves","Priority","Stage","NextStep","CUsUsing","AssetSize","Reference","Notes"];
   const rows = vendors.map(v=>[
     v.fintechName,(v.departmentFocus||[]).join("|"),v.conference,v.conferenceDate,
     v.internationalSupport,v.ncuaCompliance,v.scalability,v.fiserDNA,
     v.alkami,v.meridianLink,v.departmentFit,v.implementationEffort,
     v.weighted?.toFixed(2),v.effortAdj?.toFixed(2),getGrade(v.effortAdj||0).grade,
     v.mustHave?"Pass":"Fail",v.strategicPriority,v.pipelineStage,
-    v.nextStep,v.cusUsing,v.cuAssetSize,v.referenceContact,v.website||"",
+    v.nextStep,v.cusUsing,v.cuAssetSize,v.referenceContact,
     `"${(v.notes||"").replace(/"/g,'""')}"`
   ]);
   const csv=[headers,...rows].map(r=>r.join(",")).join("\n");
@@ -890,24 +890,6 @@ function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartme
               ))}
             </div>
           </div>
-          {/* Website */}
-          <div style={{marginBottom:16}}>
-            <label style={css.label}>Website</label>
-            <div style={{display:"flex",gap:8,alignItems:"center"}}>
-              <input value={form.website||""} onChange={e=>set("website",e.target.value)}
-                placeholder="https://www.example.com"
-                type="url"
-                style={{...css.input,flex:1}}/>
-              {form.website&&(
-                <a href={form.website.startsWith("http")?form.website:"https://"+form.website}
-                  target="_blank" rel="noopener noreferrer"
-                  style={{padding:"8px 14px",background:"rgba(0,212,170,0.1)",border:"1px solid rgba(0,212,170,0.25)",borderRadius:6,color:"#00d4aa",fontSize:13,cursor:"pointer",whiteSpace:"nowrap",textDecoration:"none",minHeight:44,display:"flex",alignItems:"center"}}>
-                  Visit ↗
-                </a>
-              )}
-            </div>
-          </div>
-
           {/* Free-form additional notes */}
           <label style={css.label}>Additional Notes</label>
           <textarea value={form.notes} onChange={e=>set("notes",e.target.value)} rows={3}
@@ -1316,7 +1298,6 @@ function FolderDetailView({folder,vendors,onBack,onEditVendor,weights,weightLabe
                   <div style={{fontSize:22,fontWeight:700,color:"#00d4aa"}}>{(v.effortAdj||0).toFixed(2)}</div>
                   <span style={{padding:"2px 8px",borderRadius:4,background:`${grade.color}22`,color:grade.color,fontSize:12,fontWeight:700}}>{grade.grade}</span>
                   <div style={{fontSize:11,color:v.mustHave?"#2ecc71":"#e74c3c",marginTop:6}}>{v.mustHave?"✓ Must-Haves":"✗ Must-Haves"}</div>
-                  {v.website&&<a href={v.website.startsWith("http")?v.website:"https://"+v.website} target="_blank" rel="noopener noreferrer" style={{display:"block",marginTop:6,fontSize:11,color:"#00d4aa",textDecoration:"none",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🌐 {v.website.replace(/^https?:\/\//,"").replace(/\/$/,"")}</a>}
                   <button onClick={()=>onEditVendor(v)} style={{marginTop:8,width:"100%",padding:"5px",background:"rgba(77,184,255,0.1)",border:"1px solid rgba(77,184,255,0.2)",borderRadius:6,color:"#4db8ff",fontSize:12,cursor:"pointer"}}>Edit / Notes</button>
                 </div>
               );
@@ -1823,10 +1804,9 @@ export default function App() {
                       <span>{(v.departmentFocus||[]).join(", ")}</span>
                       {v.conference&&<span>· {v.conference}</span>}
                     </div>
-                    <div style={{display:"flex",gap:8,alignItems:"center",marginTop:2,fontSize:11,flexWrap:"wrap"}}>
+                    <div style={{display:"flex",gap:8,alignItems:"center",marginTop:2,fontSize:11}}>
                       <span style={{color:v.vendorWeights?"#4488aa":"#334"}}>{v.vendorWeights?"📌 Own model":"📋 Global model"}</span>
-                      {v.website&&<a href={v.website.startsWith("http")?v.website:"https://"+v.website} target="_blank" rel="noopener noreferrer" style={{color:"#00d4aa",textDecoration:"none"}}>🌐 {v.website.replace(/^https?:\/\//,"").replace(/\/$/,"")}</a>}
-                      {v.notes&&<span style={{color:"#445",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:260}}>· {v.notes}</span>}
+                      {v.notes&&<span style={{color:"#445",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:300}}>· {v.notes}</span>}
                     </div>
                   </div>
                   <div style={{textAlign:"right"}}>
