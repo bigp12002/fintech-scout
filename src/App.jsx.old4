@@ -104,27 +104,15 @@ function meetsMustHaves(f,mustHaves) { return Object.entries(mustHaves).every(([
 function getGrade(score) { return GRADES.find(g=>score>=g.min)||GRADES[GRADES.length-1]; }
 
 function exportCSV(vendors, weights) {
-  const esc = s => `"${(s||"").replace(/"/g,'""')}"`; // wrap in quotes, escape internal quotes
-  const headers = [
-    "Name","Departments","Conference","Date",
-    "Int'l","NCUA","Scale","DNA","Alkami","MeridianLink","DeptFit","Effort",
-    "Weighted","EffortAdj","Grade","MustHaves",
-    "Priority","Stage","NextStep",
-    "CUsUsing","AssetSize","Reference","Website",
-    "Pitch Summary","Key Differentiator","CU Experience","Integration Story",
-    "Pricing Model","Implementation Timeline","Demo Quality","Red Flags",
-    "Follow-Up Action","Additional Notes"
-  ];
+  const headers = ["Name","Departments","Conference","Date","Int'l","NCUA","Scale","DNA","Alkami","MeridianLink","DeptFit","Effort","Weighted","EffortAdj","Grade","MustHaves","Priority","Stage","NextStep","CUsUsing","AssetSize","Reference","Website","Notes"];
   const rows = vendors.map(v=>[
-    esc(v.fintechName),esc((v.departmentFocus||[]).join("|")),esc(v.conference),esc(v.conferenceDate),
+    v.fintechName,(v.departmentFocus||[]).join("|"),v.conference,v.conferenceDate,
     v.internationalSupport,v.ncuaCompliance,v.scalability,v.fiserDNA,
     v.alkami,v.meridianLink,v.departmentFit,v.implementationEffort,
     v.weighted?.toFixed(2),v.effortAdj?.toFixed(2),getGrade(v.effortAdj||0).grade,
-    v.mustHave?"Pass":"Fail",esc(v.strategicPriority),esc(v.pipelineStage),
-    esc(v.nextStep),esc(v.cusUsing),esc(v.cuAssetSize),esc(v.referenceContact),esc(v.website),
-    esc(v.notePitchSummary),esc(v.noteDifferentiator),esc(v.noteCUExperience),esc(v.noteIntegration),
-    esc(v.notePricing),esc(v.noteTimeline),esc(v.noteDemoQuality),esc(v.noteRedFlags),
-    esc(v.noteFollowUp),esc(v.notes)
+    v.mustHave?"Pass":"Fail",v.strategicPriority,v.pipelineStage,
+    v.nextStep,v.cusUsing,v.cuAssetSize,v.referenceContact,v.website||"",
+    `"${(v.notes||"").replace(/"/g,'""')}"`
   ]);
   const csv=[headers,...rows].map(r=>r.join(",")).join("\n");
   const blob=new Blob([csv],{type:"text/csv"});
