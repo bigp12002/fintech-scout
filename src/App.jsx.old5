@@ -551,7 +551,7 @@ function WeightsEditor({weights,weightLabels,onChange,onLabelsChange,mustHaves,o
 
 // ─── Entry Form ───────────────────────────────────────────────────────────────
 
-function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartment,onAddConference,weights,weightLabels,mustHaves,folders=[],quickMode=false,vendors=[]}) {
+function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartment,onAddConference,weights,weightLabels,mustHaves,folders=[],quickMode=false}) {
   const [form,setForm]=useState(()=>{
     const base = initial || EMPTY_FORM;
     return {
@@ -595,12 +595,6 @@ function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartme
     },10000);
     return()=>{if(autoSaveTimer.current)clearTimeout(autoSaveTimer.current);};
   },[form]);
-
-  // Live duplicate detection — memoized so it never runs inline during render
-  const liveDupes=useMemo(()=>{
-    if(!form.fintechName||form.fintechName.length<4) return [];
-    return findPotentialDupes(form.fintechName, vendors, form.id||null);
-  },[form.fintechName, vendors, form.id]);
 
   // Inline label editing state
   const [vendorEditingLabel,setVendorEditingLabel]=useState(null);
@@ -707,17 +701,6 @@ function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartme
           <div style={{gridColumn:"1/-1"}}>
             <label style={css.label}>Fintech Name *</label>
             <input value={form.fintechName} onChange={e=>set("fintechName",e.target.value)} placeholder="e.g. Zest AI" style={{...css.input,fontSize:16,padding:"12px"}}/>
-            {liveDupes.length>0&&(
-              <div style={{marginTop:6,padding:"8px 12px",background:"rgba(255,215,61,0.08)",border:"1px solid rgba(255,215,61,0.3)",borderRadius:6}}>
-                <div style={{fontSize:11,color:"#ffd93d",fontWeight:600,marginBottom:4}}>⚠ Possible duplicate{liveDupes.length>1?"s":""} found</div>
-                {liveDupes.slice(0,3).map((d,i)=>(
-                  <div key={i} style={{fontSize:12,color:"#aabbcc",marginBottom:2}}>
-                    <span style={{color:"#fff",fontWeight:600}}>{d.vendor.fintechName}</span>
-                    <span style={{color:"#556",marginLeft:6}}>({d.reason} · {Math.round(d.score*100)}% match · {d.vendor.conference||"no conference"})</span>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
           <div style={{gridColumn:"1/-1"}}>
             <label style={css.label}>Department Focus * (select multiple)</label>
@@ -1445,52 +1428,6 @@ function FolderDetailView({folder,vendors,onBack,onEditVendor,weights,weightLabe
   );
 }
 
-// ─── Duplicate Detection Helpers ─────────────────────────────────────────────
-
-// Normalize a vendor name for comparison: lowercase, strip punctuation/spaces
-function normalizeName(s) {
-  return (s||"").toLowerCase()
-    .replace(/[.\-_,!?'"/\\()\[\]{}]/g,"")   // strip punctuation
-    .replace(/\s+/g," ")                          // collapse whitespace
-    .trim();
-}
-
-// Simple Levenshtein distance
-function levenshtein(a, b) {
-  const m=a.length, n=b.length;
-  const dp=Array.from({length:m+1},(_,i)=>[i,...Array(n).fill(0)]);
-  for(let j=0;j<=n;j++) dp[0][j]=j;
-  for(let i=1;i<=m;i++) for(let j=1;j<=n;j++)
-    dp[i][j]=a[i-1]===b[j-1]?dp[i-1][j-1]:1+Math.min(dp[i-1][j],dp[i][j-1],dp[i-1][j-1]);
-  return dp[m][n];
-}
-
-// Returns similarity score 0-1 (1 = identical)
-function similarityScore(a, b) {
-  const na=normalizeName(a), nb=normalizeName(b);
-  if(!na||!nb) return 0;
-  if(na===nb) return 1;
-  // Check if one contains the other
-  if(na.includes(nb)||nb.includes(na)) return 0.9;
-  // Levenshtein similarity
-  const maxLen=Math.max(na.length,nb.length);
-  const dist=levenshtein(na,nb);
-  return 1-(dist/maxLen);
-}
-
-// Find potential duplicates — returns array of {vendor, score, reason}
-function findPotentialDupes(name, vendors, excludeId=null) {
-  const results = [];
-  for(const v of vendors) {
-    if(v.id===excludeId) continue;
-    const score=similarityScore(name, v.fintechName);
-    if(score===1) results.push({vendor:v, score, reason:"Exact match"});
-    else if(score>=0.9) results.push({vendor:v, score, reason:"Very similar name"});
-    else if(score>=0.75) results.push({vendor:v, score, reason:"Similar name"});
-  }
-  return results.sort((a,b)=>b.score-a.score);
-}
-
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -1628,10 +1565,8 @@ export default function App() {
   const saveVendor=(v,isAutoSave=false)=>{
     // Skip dupe check on autosave (vendor already exists in the list from prior save)
     if(!isAutoSave){
-      const dupes=findPotentialDupes(v.fintechName, vendors, v.id||null);
-      // Block on exact match for new vendors; warn on fuzzy for all saves
-      if(dupes.length>0&&!v.id){setDupeWarning({vendor:v,dupes});return;}
-      if(dupes.length>0&&v.id&&dupes[0].score===1){setDupeWarning({vendor:v,dupes});return;}
+      const dupeCheck=vendors.find(x=>x.id!==v.id&&x.fintechName.toLowerCase()===v.fintechName.toLowerCase());
+      if(dupeCheck&&!v.id){setDupeWarning(v);return;}
     }
     // Snapshot the current global scoring model into the vendor if not already set
     const vendorWithSnapshot = {
@@ -1971,47 +1906,21 @@ export default function App() {
           <EntryForm initial={editItem} onSave={saveVendor} onClose={()=>{setShowForm(false);setEditItem(null);}}
             departments={departments} conferences={conferences}
             onAddDepartment={addDepartment} onAddConference={addConference}
-            weights={weights} weightLabels={weightLabels} mustHaves={mustHaves} folders={folders} quickMode={quickMode}
-            vendors={vendors}/>
+            weights={weights} weightLabels={weightLabels} mustHaves={mustHaves} folders={folders} quickMode={quickMode}/>
         </Modal>
       )}
 
       {/* Dupe Warning */}
       {dupeWarning&&(
         <Modal onClose={()=>setDupeWarning(null)}>
-          <div style={{padding:24,maxWidth:460}}>
-            <h3 style={{color:"#ffd93d",marginBottom:8}}>⚠ Possible Duplicate Detected</h3>
-            <p style={{color:"#889",marginBottom:12}}>
-              "<strong style={{color:"#fff"}}>{dupeWarning.vendor.fintechName}</strong>" is similar to {dupeWarning.dupes.length} existing vendor{dupeWarning.dupes.length>1?"s":""}:
-            </p>
-            <div style={{marginBottom:18,background:"rgba(255,255,255,0.03)",borderRadius:8,border:"1px solid rgba(255,255,255,0.08)",overflow:"hidden"}}>
-              {dupeWarning.dupes.slice(0,5).map((d,i)=>(
-                <div key={i} style={{padding:"10px 14px",borderBottom:i<Math.min(dupeWarning.dupes.length,5)-1?"1px solid rgba(255,255,255,0.06)":"none",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <div>
-                    <div style={{fontSize:14,color:"#fff",fontWeight:600}}>{d.vendor.fintechName}</div>
-                    <div style={{fontSize:11,color:"#556",marginTop:2}}>{d.vendor.conference||"No conference"} · {d.reason}</div>
-                  </div>
-                  <div style={{
-                    padding:"3px 10px",borderRadius:12,fontSize:12,fontWeight:700,flexShrink:0,marginLeft:12,
-                    background:d.score===1?"rgba(231,76,60,0.15)":"rgba(255,215,61,0.12)",
-                    color:d.score===1?"#e74c3c":"#ffd93d"
-                  }}>{Math.round(d.score*100)}% match</div>
-                </div>
-              ))}
-            </div>
-            <p style={{color:"#667",fontSize:12,marginBottom:20}}>Is this a new vendor or an existing one? If it already exists, cancel and edit the existing record instead.</p>
-            <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
-              <button onClick={()=>setDupeWarning(null)}
-                style={{padding:"12px 20px",background:"none",border:"1px solid rgba(255,255,255,0.15)",color:"#889",borderRadius:6,cursor:"pointer",minHeight:48}}>
-                Cancel — It's a duplicate
-              </button>
-              <button onClick={()=>{
-                const v=dupeWarning.vendor;
-                const snap={...v,id:Date.now(),vendorWeights:v.vendorWeights||weights,vendorWeightLabels:v.vendorWeightLabels||weightLabels,vendorMustHaves:v.vendorMustHaves||mustHaves};
-                const next=[...vendors,snap];setVendors(next);persistVendors(next);setShowForm(false);setDupeWarning(null);
-              }} style={{padding:"12px 20px",background:"#ffd93d",border:"none",color:"#000",borderRadius:6,cursor:"pointer",fontWeight:700,minHeight:48}}>
-                Save as New Vendor
-              </button>
+          <div style={{textAlign:"center",padding:20}}>
+            <div style={{fontSize:36,marginBottom:16}}>⚠️</div>
+            <h3 style={{color:"#ffd93d",marginBottom:8}}>Duplicate Detected</h3>
+            <p style={{color:"#889",marginBottom:24}}>A vendor named "<strong style={{color:"#fff"}}>{dupeWarning.fintechName}</strong>" already exists. Save anyway?</p>
+            <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+              <button onClick={()=>setDupeWarning(null)} style={{padding:"12px 20px",background:"none",border:"1px solid rgba(255,255,255,0.15)",color:"#889",borderRadius:6,cursor:"pointer",minHeight:48}}>Cancel</button>
+              <button onClick={()=>{const snap={...dupeWarning,id:Date.now(),vendorWeights:dupeWarning.vendorWeights||weights,vendorWeightLabels:dupeWarning.vendorWeightLabels||weightLabels,vendorMustHaves:dupeWarning.vendorMustHaves||mustHaves};const next=[...vendors,snap];setVendors(next);persistVendors(next);setShowForm(false);setDupeWarning(null);}}
+                style={{padding:"12px 20px",background:"#ffd93d",border:"none",color:"#000",borderRadius:6,cursor:"pointer",fontWeight:700,minHeight:48}}>Save Anyway</button>
             </div>
           </div>
         </Modal>
