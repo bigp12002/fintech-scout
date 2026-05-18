@@ -85,7 +85,7 @@ const EMPTY_FORM = {
   notePitchSummary:"",noteDifferentiator:"",noteCUExperience:"",
   noteIntegration:"",notePricing:"",noteTimeline:"",
   noteDemoQuality:"",noteRedFlags:"",noteFollowUp:"",
-  website:"",notes:"",noteRawScratch:"",noteHistory:[],
+  website:"",notes:"",noteHistory:[],
   folderId:null,
   // Per-vendor scoring snapshot
   vendorWeights:null,vendorWeightLabels:null,vendorMustHaves:null,
@@ -549,262 +549,6 @@ function WeightsEditor({weights,weightLabels,onChange,onLabelsChange,mustHaves,o
   );
 }
 
-// ─── Notes Tab (with Scratch Pad + AI Research Fill) ─────────────────────────
-
-function NotesTab({form,set}) {
-  const [aiStatus,setAiStatus]=useState("idle"); // idle | loading | done | error
-  const [aiLog,setAiLog]=useState("");
-  const [overwriteAll,setOverwriteAll]=useState(false);
-  const [showLog,setShowLog]=useState(false);
-
-  const hasName=!!(form.fintechName&&form.fintechName.trim());
-
-  const runAiFill=async()=>{
-    if(!hasName)return;
-    setAiStatus("loading");
-    setAiLog("");
-    setShowLog(true);
-
-    // Build context from what we already know
-    const knownFields=NOTE_FIELDS
-      .filter(f=>form[f.key]&&form[f.key].trim())
-      .map(f=>`${f.label}: ${form[f.key]}`)
-      .join("\n");
-
-    const missingFields=overwriteAll
-      ?NOTE_FIELDS
-      :NOTE_FIELDS.filter(f=>!(form[f.key]&&form[f.key].trim()));
-
-    if(missingFields.length===0){
-      setAiStatus("done");
-      setAiLog("All fields already filled. Toggle 'Overwrite existing' to re-research.");
-      return;
-    }
-
-    const scratchContext=form.noteRawScratch?`\n\nRAW BOOTH NOTES FROM EVALUATOR:\n${form.noteRawScratch}`:"";
-    const websiteContext=form.website?`\nVendor website: ${form.website}`:"";
-    const knownContext=knownFields?`\n\nALREADY CAPTURED:\n${knownFields}`:"";
-
-    const systemPrompt=`You are a fintech analyst assistant for a credit union (CU) evaluating vendors at a conference. You research vendors using web search and return concise, practical answers in a strict JSON format.
-
-Context about the evaluating organization:
-- Credit union using Fiserv DNA core, Alkami digital banking, MeridianLink loan origination
-- Focused on NCUA regulatory compliance and international/multilingual member support
-- Evaluating vendors for operational fit and strategic value
-
-Your job: research the fintech vendor named below and fill in the requested fields. Use web search to find current, accurate information. Be concise and practical — these are working notes for a credit union evaluator, not marketing copy. If information is genuinely unavailable, say "Not publicly available" rather than guessing.
-
-Return ONLY valid JSON with this exact shape (all values are strings):
-{
-  "notePitchSummary": "...",
-  "noteDifferentiator": "...",
-  "noteCUExperience": "...",
-  "noteIntegration": "...",
-  "notePricing": "...",
-  "noteTimeline": "...",
-  "noteDemoQuality": "...",
-  "noteRedFlags": "...",
-  "noteFollowUp": "..."
-}
-
-Only include keys for the fields listed in FIELDS TO FILL. Do not add markdown, commentary, or extra keys.`;
-
-    const userPrompt=`VENDOR: ${form.fintechName}${websiteContext}${scratchContext}${knownContext}
-
-FIELDS TO FILL:
-${missingFields.map(f=>`- ${f.key} (${f.label}): ${f.placeholder}`).join("\n")}
-
-Research this vendor across the web (website, press releases, fintech databases, LinkedIn, G2, Crunchbase, etc.) and return the JSON.`;
-
-    const ANTHROPIC_KEY=import.meta.env.VITE_ANTHROPIC_KEY;
-    if(!ANTHROPIC_KEY){
-      setAiLog("Error: VITE_ANTHROPIC_KEY is not set. Add it to your Vercel environment variables and redeploy.");
-      setAiStatus("error");
-      setShowLog(true);
-      return;
-    }
-
-    try {
-      const resp=await fetch("https://api.anthropic.com/v1/messages",{
-        method:"POST",
-        headers:{
-          "Content-Type":"application/json",
-          "x-api-key":ANTHROPIC_KEY,
-          "anthropic-version":"2023-06-01",
-          "anthropic-dangerous-direct-browser-access":"true",
-        },
-        body:JSON.stringify({
-          model:"claude-sonnet-4-20250514",
-          max_tokens:1000,
-          tools:[{type:"web_search_20250305",name:"web_search"}],
-          system:systemPrompt,
-          messages:[{role:"user",content:userPrompt}],
-        }),
-      });
-
-      if(!resp.ok){
-        const err=await resp.json().catch(()=>({}));
-        throw new Error(err?.error?.message||`HTTP ${resp.status}`);
-      }
-
-      const data=await resp.json();
-
-      // Log what the agent searched
-      const searchBlocks=data.content.filter(b=>b.type==="tool_use"&&b.name==="web_search");
-      if(searchBlocks.length){
-        setAiLog("Searched: "+searchBlocks.map(b=>b.input?.query||"").filter(Boolean).join(" · "));
-      }
-
-      // Extract JSON from text blocks
-      const textContent=data.content
-        .filter(b=>b.type==="text")
-        .map(b=>b.text)
-        .join("");
-
-      // Parse — strip markdown fences if present
-      const clean=textContent.replace(/```json|```/g,"").trim();
-      const start=clean.indexOf("{");
-      const end=clean.lastIndexOf("}");
-      if(start===-1||end===-1) throw new Error("No JSON found in response");
-      const parsed=JSON.parse(clean.slice(start,end+1));
-
-      // Apply only the fields we requested
-      const updates={};
-      missingFields.forEach(f=>{
-        if(parsed[f.key]!==undefined&&parsed[f.key]!==""){
-          updates[f.key]=parsed[f.key];
-        }
-      });
-
-      // Batch-update form
-      Object.entries(updates).forEach(([k,v])=>set(k,v));
-
-      const filledCount=Object.keys(updates).length;
-      setAiLog(prev=>(prev?prev+"\n":"")+`✓ Filled ${filledCount} of ${missingFields.length} requested fields.`);
-      setAiStatus("done");
-    }catch(err){
-      setAiLog("Error: "+err.message);
-      setAiStatus("error");
-    }
-  };
-
-  return(
-    <div>
-      {/* ── Scratch Pad ── */}
-      <div style={{marginBottom:20,padding:14,background:"rgba(255,215,61,0.04)",border:"1px solid rgba(255,215,61,0.18)",borderRadius:10}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-          <div style={{fontSize:11,color:"#ffd93d",textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600}}>📝 Scratch Pad — Raw Booth Notes</div>
-          <div style={{fontSize:10,color:"#445"}}>Type anything. The AI agent will use this as context.</div>
-        </div>
-        <textarea
-          value={form.noteRawScratch||""}
-          onChange={e=>set("noteRawScratch",e.target.value)}
-          rows={5}
-          placeholder={"Jot anything here — what they said at the booth, questions you asked, first impressions, pricing hints, names of reps, anything...\n\nThe AI Research button below will use your scratch notes + the vendor name to fill in the structured fields."}
-          style={{...css.input,resize:"vertical",fontSize:13,padding:"10px 12px",lineHeight:1.55,borderColor:"rgba(255,215,61,0.25)"}}
-        />
-      </div>
-
-      {/* ── AI Research Fill Bar ── */}
-      <div style={{marginBottom:20,padding:"12px 14px",background:"rgba(0,212,170,0.06)",border:"1px solid rgba(0,212,170,0.2)",borderRadius:10}}>
-        <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-          <button
-            onClick={runAiFill}
-            disabled={!hasName||aiStatus==="loading"}
-            style={{
-              display:"flex",alignItems:"center",gap:7,
-              padding:"10px 18px",minHeight:44,
-              background:hasName&&aiStatus!=="loading"?"linear-gradient(135deg,#00d4aa,#4db8ff)":"rgba(255,255,255,0.06)",
-              border:"none",borderRadius:8,
-              color:hasName&&aiStatus!=="loading"?"#000":"#334",
-              fontWeight:700,fontSize:14,cursor:hasName&&aiStatus!=="loading"?"pointer":"not-allowed",
-              transition:"all 0.2s",whiteSpace:"nowrap",
-            }}>
-            {aiStatus==="loading"
-              ?<><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>⟳</span> Researching…</>
-              :<>✨ AI Research &amp; Fill</>}
-          </button>
-
-          <label style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"#667",cursor:"pointer",userSelect:"none"}}>
-            <input type="checkbox" checked={overwriteAll} onChange={e=>setOverwriteAll(e.target.checked)}
-              style={{accentColor:"#00d4aa",width:14,height:14}}/>
-            Overwrite existing fields
-          </label>
-
-          {!hasName&&<span style={{fontSize:12,color:"#445"}}>Enter a Fintech Name on the Basic tab first</span>}
-
-          {(aiStatus==="done"||aiStatus==="error")&&(
-            <button onClick={()=>setShowLog(v=>!v)}
-              style={{marginLeft:"auto",background:"none",border:"none",color:"#445",fontSize:12,cursor:"pointer",padding:"4px 8px"}}>
-              {showLog?"Hide":"Show"} log
-            </button>
-          )}
-        </div>
-
-        {showLog&&aiLog&&(
-          <div style={{marginTop:10,padding:"8px 12px",background:"rgba(0,0,0,0.3)",borderRadius:6,fontSize:11,color:aiStatus==="error"?"#e74c3c":"#7799aa",whiteSpace:"pre-wrap",lineHeight:1.6}}>
-            {aiLog}
-          </div>
-        )}
-      </div>
-
-      {/* ── Structured Fields ── */}
-      <div style={{marginBottom:20,padding:12,background:"rgba(0,212,170,0.04)",border:"1px solid rgba(0,212,170,0.12)",borderRadius:8}}>
-        <div style={{fontSize:11,color:"#00d4aa",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:12,fontWeight:600}}>📋 Conference Pitch Capture</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-          {NOTE_FIELDS.map(({key,label,placeholder})=>(
-            <div key={key} style={{gridColumn:key==="notePitchSummary"||key==="noteRedFlags"||key==="noteFollowUp"?"1/-1":"auto"}}>
-              <label style={{...css.label,color:"#7799aa"}}>{label}</label>
-              <textarea value={form[key]||""} onChange={e=>set(key,e.target.value)}
-                rows={key==="notePitchSummary"?3:2}
-                placeholder={placeholder}
-                style={{...css.input,resize:"vertical",fontSize:13,padding:"8px 10px",
-                  borderColor:form[key]?"rgba(0,212,170,0.25)":"rgba(255,255,255,0.12)"}}/>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Website ── */}
-      <div style={{marginBottom:16}}>
-        <label style={css.label}>Website</label>
-        <div style={{display:"flex",gap:8,alignItems:"center"}}>
-          <input value={form.website||""} onChange={e=>set("website",e.target.value)}
-            placeholder="https://www.example.com" type="url"
-            style={{...css.input,flex:1}}/>
-          {form.website&&(
-            <a href={form.website.startsWith("http")?form.website:"https://"+form.website}
-              target="_blank" rel="noopener noreferrer"
-              style={{padding:"8px 14px",background:"rgba(0,212,170,0.1)",border:"1px solid rgba(0,212,170,0.25)",borderRadius:6,color:"#00d4aa",fontSize:13,cursor:"pointer",whiteSpace:"nowrap",textDecoration:"none",minHeight:44,display:"flex",alignItems:"center"}}>
-              Visit ↗
-            </a>
-          )}
-        </div>
-      </div>
-
-      {/* ── Additional Notes ── */}
-      <label style={css.label}>Additional Notes</label>
-      <textarea value={form.notes||""} onChange={e=>set("notes",e.target.value)} rows={3}
-        placeholder="Any other observations, booth context, or follow-up thoughts..."
-        style={{...css.input,resize:"vertical",fontSize:14}}/>
-
-      {(form.noteHistory||[]).length>0&&(
-        <div style={{marginTop:16}}>
-          <div style={{fontSize:11,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Note History</div>
-          {[...form.noteHistory].reverse().map((n,i)=>(
-            <div key={i} style={{padding:"10px 14px",background:"rgba(255,255,255,0.03)",borderRadius:8,marginBottom:8,borderLeft:"3px solid rgba(0,212,170,0.3)"}}>
-              <div style={{fontSize:10,color:"#445",marginBottom:4}}>{new Date(n.ts).toLocaleString()}</div>
-              <div style={{fontSize:13,color:"#aabbcc"}}>{n.text}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
-    </div>
-  );
-}
-
 // ─── Entry Form ───────────────────────────────────────────────────────────────
 
 function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartment,onAddConference,weights,weightLabels,mustHaves,folders=[],quickMode=false,vendors=[]}) {
@@ -1159,7 +903,57 @@ function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartme
       )}
 
       {tab==="notes"&&(
-        <NotesTab form={form} set={set}/>
+        <div>
+          {/* Structured conference capture fields */}
+          <div style={{marginBottom:20,padding:12,background:"rgba(0,212,170,0.04)",border:"1px solid rgba(0,212,170,0.12)",borderRadius:8}}>
+            <div style={{fontSize:11,color:"#00d4aa",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:12,fontWeight:600}}>📋 Conference Pitch Capture</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+              {NOTE_FIELDS.map(({key,label,placeholder})=>(
+                <div key={key} style={{gridColumn:key==="notePitchSummary"||key==="noteRedFlags"||key==="noteFollowUp"?"1/-1":"auto"}}>
+                  <label style={{...css.label,color:"#7799aa"}}>{label}</label>
+                  <textarea value={form[key]||""} onChange={e=>set(key,e.target.value)}
+                    rows={key==="notePitchSummary"?3:2}
+                    placeholder={placeholder}
+                    style={{...css.input,resize:"vertical",fontSize:13,padding:"8px 10px"}}/>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Website */}
+          <div style={{marginBottom:16}}>
+            <label style={css.label}>Website</label>
+            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+              <input value={form.website||""} onChange={e=>set("website",e.target.value)}
+                placeholder="https://www.example.com"
+                type="url"
+                style={{...css.input,flex:1}}/>
+              {form.website&&(
+                <a href={form.website.startsWith("http")?form.website:"https://"+form.website}
+                  target="_blank" rel="noopener noreferrer"
+                  style={{padding:"8px 14px",background:"rgba(0,212,170,0.1)",border:"1px solid rgba(0,212,170,0.25)",borderRadius:6,color:"#00d4aa",fontSize:13,cursor:"pointer",whiteSpace:"nowrap",textDecoration:"none",minHeight:44,display:"flex",alignItems:"center"}}>
+                  Visit ↗
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* Free-form additional notes */}
+          <label style={css.label}>Additional Notes</label>
+          <textarea value={form.notes} onChange={e=>set("notes",e.target.value)} rows={3}
+            placeholder="Any other observations, booth context, or follow-up thoughts..."
+            style={{...css.input,resize:"vertical",fontSize:14}}/>
+          {(form.noteHistory||[]).length>0&&(
+            <div style={{marginTop:16}}>
+              <div style={{fontSize:11,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Note History</div>
+              {[...form.noteHistory].reverse().map((n,i)=>(
+                <div key={i} style={{padding:"10px 14px",background:"rgba(255,255,255,0.03)",borderRadius:8,marginBottom:8,borderLeft:"3px solid rgba(0,212,170,0.3)"}}>
+                  <div style={{fontSize:10,color:"#445",marginBottom:4}}>{new Date(n.ts).toLocaleString()}</div>
+                  <div style={{fontSize:13,color:"#aabbcc"}}>{n.text}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Autosave status bar */}
