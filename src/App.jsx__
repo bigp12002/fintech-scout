@@ -594,9 +594,7 @@ Context about the evaluating organization:
 
 Your job: research the fintech vendor named below and fill in the requested fields. Use web search to find current, accurate information. Be concise and practical — these are working notes for a credit union evaluator, not marketing copy. If information is genuinely unavailable, say "Not publicly available" rather than guessing.
 
-CRITICAL OUTPUT RULE: Your final message must be ONLY a raw JSON object — no prose before it, no prose after it, no markdown fences, no "Research notes", no "---" separators, no commentary of any kind. Start your response with { and end with }. Any text outside the JSON object will break the parser.
-
-JSON shape (all values are strings, only include keys from FIELDS TO FILL):
+Return ONLY valid JSON with this exact shape (all values are strings):
 {
   "notePitchSummary": "...",
   "noteDifferentiator": "...",
@@ -607,7 +605,9 @@ JSON shape (all values are strings, only include keys from FIELDS TO FILL):
   "noteDemoQuality": "...",
   "noteRedFlags": "...",
   "noteFollowUp": "..."
-}`;
+}
+
+Only include keys for the fields listed in FIELDS TO FILL. Do not add markdown, commentary, or extra keys.`;
 
     const userPrompt=`VENDOR: ${form.fintechName}${websiteContext}${scratchContext}${knownContext}
 
@@ -692,24 +692,11 @@ Research this vendor across the web (website, press releases, fintech databases,
         .map(b=>b.text)
         .join("");
 
-      // Strip markdown fences and any preamble before the first {
       const clean=textContent.replace(/```json|```/g,"").trim();
       const start=clean.indexOf("{");
       const end=clean.lastIndexOf("}");
-      if(start===-1||end===-1) throw new Error("Model returned no JSON. Raw: "+clean.slice(0,300));
-      let parsed;
-      try {
-        parsed=JSON.parse(clean.slice(start,end+1));
-      } catch(parseErr) {
-        // Nested braces may have tripped up lastIndexOf — try scanning for valid JSON
-        let found=false;
-        for(let e=clean.length-1;e>=start;e--){
-          if(clean[e]==="}"){
-            try { parsed=JSON.parse(clean.slice(start,e+1)); found=true; break; } catch(e2){}
-          }
-        }
-        if(!found) throw new Error("Could not parse JSON from response. Raw: "+clean.slice(start,start+300));
-      }
+      if(start===-1||end===-1) throw new Error("Model returned no JSON. Raw response: "+clean.slice(0,300));
+      const parsed=JSON.parse(clean.slice(start,end+1));
 
       const updates={};
       missingFields.forEach(f=>{
