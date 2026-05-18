@@ -624,8 +624,8 @@ Research this vendor across the web (website, press releases, fintech databases,
       return;
     }
 
-    const callAPI=async(messages)=>{
-      const r=await fetch("https://api.anthropic.com/v1/messages",{
+    try {
+      const resp=await fetch("https://api.anthropic.com/v1/messages",{
         method:"POST",
         headers:{
           "Content-Type":"application/json",
@@ -635,75 +635,48 @@ Research this vendor across the web (website, press releases, fintech databases,
         },
         body:JSON.stringify({
           model:"claude-sonnet-4-6",
-          max_tokens:1500,
+          max_tokens:1000,
           tools:[{type:"web_search_20250305",name:"web_search"}],
           system:systemPrompt,
-          messages,
+          messages:[{role:"user",content:userPrompt}],
         }),
       });
-      if(!r.ok){
-        const err=await r.json().catch(()=>({}));
-        throw new Error(err?.error?.message||`HTTP ${r.status}`);
-      }
-      return r.json();
-    };
 
-    try {
-      // Agentic loop: web_search requires multiple turns before end_turn
-      let messages=[{role:"user",content:userPrompt}];
-      let data=null;
-      const searchQueries=[];
-      const MAX_TURNS=6;
-
-      for(let turn=0;turn<MAX_TURNS;turn++){
-        data=await callAPI(messages);
-
-        // Collect search queries for the log
-        data.content
-          .filter(b=>b.type==="tool_use"&&b.name==="web_search")
-          .forEach(b=>{ if(b.input?.query) searchQueries.push(b.input.query); });
-        if(searchQueries.length) setAiLog("Searched: "+searchQueries.join(" · "));
-
-        // Model finished writing — has the JSON
-        if(data.stop_reason==="end_turn") break;
-
-        // Model wants to search — feed results back and continue
-        if(data.stop_reason==="tool_use"){
-          const toolResults=data.content
-            .filter(b=>b.type==="tool_use")
-            .map(b=>({
-              type:"tool_result",
-              tool_use_id:b.id,
-              content:b.output||b.content||"Search complete.",
-            }));
-          messages=[
-            ...messages,
-            {role:"assistant",content:data.content},
-            {role:"user",content:toolResults},
-          ];
-          continue;
-        }
-        break;
+      if(!resp.ok){
+        const err=await resp.json().catch(()=>({}));
+        throw new Error(err?.error?.message||`HTTP ${resp.status}`);
       }
 
-      // Pull JSON out of final text blocks
-      const textContent=(data?.content||[])
+      const data=await resp.json();
+
+      // Log what the agent searched
+      const searchBlocks=data.content.filter(b=>b.type==="tool_use"&&b.name==="web_search");
+      if(searchBlocks.length){
+        setAiLog("Searched: "+searchBlocks.map(b=>b.input?.query||"").filter(Boolean).join(" · "));
+      }
+
+      // Extract JSON from text blocks
+      const textContent=data.content
         .filter(b=>b.type==="text")
         .map(b=>b.text)
         .join("");
 
+      // Parse — strip markdown fences if present
       const clean=textContent.replace(/```json|```/g,"").trim();
       const start=clean.indexOf("{");
       const end=clean.lastIndexOf("}");
-      if(start===-1||end===-1) throw new Error("Model returned no JSON. Raw response: "+clean.slice(0,300));
+      if(start===-1||end===-1) throw new Error("No JSON found in response");
       const parsed=JSON.parse(clean.slice(start,end+1));
 
+      // Apply only the fields we requested
       const updates={};
       missingFields.forEach(f=>{
         if(parsed[f.key]!==undefined&&parsed[f.key]!==""){
           updates[f.key]=parsed[f.key];
         }
       });
+
+      // Batch-update form
       Object.entries(updates).forEach(([k,v])=>set(k,v));
 
       const filledCount=Object.keys(updates).length;
