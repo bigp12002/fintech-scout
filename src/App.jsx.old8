@@ -143,10 +143,10 @@ function exportJSON(state) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const css = {
-  card:{background:"var(--bg-card)",border:"1px solid var(--border-subtle)",borderRadius:10,padding:20},
-  input:{width:"100%",background:"var(--bg-input)",border:"1px solid var(--border)",borderRadius:6,padding:"8px 12px",color:"var(--text-primary)",fontSize:14,boxSizing:"border-box",fontFamily:"inherit"},
-  selectDark:{background:"var(--select-bg)",border:"1px solid var(--border)",borderRadius:6,padding:"8px 12px",color:"var(--text-primary)",fontSize:14},
-  label:{fontSize:11,color:"var(--text-muted)",letterSpacing:"0.08em",textTransform:"uppercase",display:"block",marginBottom:4},
+  card:{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:10,padding:20},
+  input:{width:"100%",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:6,padding:"8px 12px",color:"#fff",fontSize:14,boxSizing:"border-box",fontFamily:"inherit"},
+  selectDark:{background:"#0f1923",border:"1px solid rgba(255,255,255,0.12)",borderRadius:6,padding:"8px 12px",color:"#fff",fontSize:14},
+  label:{fontSize:11,color:"#8899aa",letterSpacing:"0.08em",textTransform:"uppercase",display:"block",marginBottom:4},
 };
 
 // ─── UI Primitives ────────────────────────────────────────────────────────────
@@ -154,10 +154,10 @@ const css = {
 function ScoreBar({value,max=5,color="#00d4aa"}) {
   return (
     <div style={{display:"flex",alignItems:"center",gap:6}}>
-      <div style={{flex:1,height:6,background:"var(--border)",borderRadius:3,overflow:"hidden"}}>
+      <div style={{flex:1,height:6,background:"rgba(255,255,255,0.08)",borderRadius:3,overflow:"hidden"}}>
         <div style={{width:`${Math.min((value/max)*100,100)}%`,height:"100%",background:color,borderRadius:3,transition:"width 0.4s ease"}}/>
       </div>
-      <span style={{fontSize:11,color:"var(--text-muted)",minWidth:24,textAlign:"right"}}>{typeof value==="number"?value.toFixed(1):value}</span>
+      <span style={{fontSize:11,color:"#aaa",minWidth:24,textAlign:"right"}}>{typeof value==="number"?value.toFixed(1):value}</span>
     </div>
   );
 }
@@ -169,12 +169,12 @@ function RatingInput({label,value,onChange,hint,highlight}) {
         <label style={{...css.label,color:highlight?"#ffd93d":"#8899aa"}}>{label}</label>
         <span style={{fontSize:13,color:"#00d4aa",fontWeight:700}}>{value}</span>
       </div>
-      {hint&&<div style={{fontSize:10,color:"var(--text-dim)",marginBottom:4}}>{hint}</div>}
+      {hint&&<div style={{fontSize:10,color:"#556",marginBottom:4}}>{hint}</div>}
       <div style={{display:"flex",gap:6}}>
         {[1,2,3,4,5].map(n=>(
           <button key={n} onClick={()=>onChange(n)} style={{
             flex:1,padding:"10px 0",border:"1px solid",
-            borderColor:value===n?"#00d4aa":"var(--border)",
+            borderColor:value===n?"#00d4aa":"rgba(255,255,255,0.1)",
             background:value===n?"rgba(0,212,170,0.15)":"rgba(255,255,255,0.03)",
             color:value===n?"#00d4aa":"#667",
             borderRadius:6,fontSize:16,cursor:"pointer",fontWeight:value===n?700:400,transition:"all 0.15s",
@@ -195,7 +195,7 @@ function Modal({children,onClose,wide}) {
   return (
     <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:"0"}}>
       <div onClick={e=>e.stopPropagation()} style={{
-        background:"var(--bg-modal)",border:"1px solid rgba(0,212,170,0.2)",
+        background:"#0a1520",border:"1px solid rgba(0,212,170,0.2)",
         borderRadius:"16px 16px 0 0",
         width:"100%",maxWidth:wide?920:700,maxHeight:"92vh",overflowY:"auto",
         padding:"24px 24px 40px",
@@ -222,7 +222,7 @@ function CreatableSelect({value,onChange,options,placeholder,onAddOption}) {
       <button onClick={()=>{if(inputVal.trim()){onAddOption(inputVal.trim());onChange(inputVal.trim());}setTyping(false);setInputVal("");}}
         style={{padding:"8px 12px",background:"#00d4aa",border:"none",borderRadius:6,color:"#000",fontWeight:700,cursor:"pointer",fontSize:13,whiteSpace:"nowrap",minHeight:44}}>Add</button>
       <button onClick={()=>{setTyping(false);setInputVal("");}}
-        style={{padding:"8px 10px",background:"var(--bg-hover)",border:"1px solid var(--border)",borderRadius:6,color:"var(--text-faint)",cursor:"pointer",minHeight:44}}>✕</button>
+        style={{padding:"8px 10px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:6,color:"#889",cursor:"pointer",minHeight:44}}>✕</button>
     </div>
   );
   return (
@@ -249,7 +249,7 @@ function MultiSelect({values=[],onChange,options,placeholder,onAddOption}) {
             <button onClick={()=>toggle(v)} style={{background:"none",border:"none",color:"#00d4aa",cursor:"pointer",fontSize:16,lineHeight:1,padding:0,minWidth:20,minHeight:20}}>×</button>
           </span>
         ))}
-        {values.length===0&&<span style={{fontSize:13,color:"var(--text-dim)"}}>{placeholder}</span>}
+        {values.length===0&&<span style={{fontSize:13,color:"#445"}}>{placeholder}</span>}
       </div>
       {typing&&(
         <div style={{display:"flex",gap:6,marginBottom:8}}>
@@ -261,14 +261,14 @@ function MultiSelect({values=[],onChange,options,placeholder,onAddOption}) {
             placeholder="New department..." style={{...css.input,flex:1,border:"1px solid rgba(0,212,170,0.4)"}}/>
           <button onClick={()=>{if(inputVal.trim()){onAddOption(inputVal.trim());toggle(inputVal.trim());}setTyping(false);setInputVal("");}}
             style={{padding:"8px 12px",background:"#00d4aa",border:"none",borderRadius:6,color:"#000",fontWeight:700,cursor:"pointer",fontSize:13,minHeight:44}}>Add</button>
-          <button onClick={()=>{setTyping(false);setInputVal("");}} style={{padding:"8px 10px",background:"var(--bg-hover)",border:"1px solid var(--border)",borderRadius:6,color:"var(--text-faint)",cursor:"pointer",minHeight:44}}>✕</button>
+          <button onClick={()=>{setTyping(false);setInputVal("");}} style={{padding:"8px 10px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:6,color:"#889",cursor:"pointer",minHeight:44}}>✕</button>
         </div>
       )}
       <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
         {options.map(opt=>(
           <button key={opt} onClick={()=>toggle(opt)} style={{
             padding:"8px 14px",border:"1px solid",fontSize:13,borderRadius:12,cursor:"pointer",transition:"all 0.15s",
-            borderColor:values.includes(opt)?"rgba(0,212,170,0.4)":"var(--border)",
+            borderColor:values.includes(opt)?"rgba(0,212,170,0.4)":"rgba(255,255,255,0.1)",
             background:values.includes(opt)?"rgba(0,212,170,0.1)":"rgba(255,255,255,0.03)",
             color:values.includes(opt)?"#00d4aa":"#667",minHeight:40,touchAction:"manipulation",
           }}>{opt}</button>
@@ -304,7 +304,7 @@ function SwipeCard({vendor,onPass,onProceed,onEdit}) {
       onMouseDown={handleStart} onMouseMove={handleMove} onMouseUp={handleEnd} onMouseLeave={handleEnd}
       onTouchStart={handleStart} onTouchMove={handleMove} onTouchEnd={handleEnd}
       style={{
-        position:"relative",padding:20,borderRadius:16,border:"1px solid var(--border)",
+        position:"relative",padding:20,borderRadius:16,border:"1px solid rgba(255,255,255,0.1)",
         background:bg,transform:`translateX(${drag}px) rotate(${rotation}deg)`,
         transition:drag===0?"transform 0.3s ease":"none",cursor:"grab",userSelect:"none",
         touchAction:"pan-y",marginBottom:12,
@@ -313,8 +313,8 @@ function SwipeCard({vendor,onPass,onProceed,onEdit}) {
       {drag<-40&&<div style={{position:"absolute",top:16,left:20,fontSize:22,color:"#e74c3c",fontWeight:700,opacity:Math.min(-drag/80,1)}}>✗ PASS</div>}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
         <div style={{flex:1}}>
-          <div style={{fontSize:18,fontWeight:700,color:"var(--text-primary)",marginBottom:4}}>{vendor.fintechName}</div>
-          <div style={{fontSize:13,color:"var(--text-dim)",marginBottom:8}}>{(vendor.departmentFocus||[]).join(", ")}</div>
+          <div style={{fontSize:18,fontWeight:700,color:"#fff",marginBottom:4}}>{vendor.fintechName}</div>
+          <div style={{fontSize:13,color:"#556",marginBottom:8}}>{(vendor.departmentFocus||[]).join(", ")}</div>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
             <span style={{fontSize:12,color:vendor.mustHave?"#2ecc71":"#e74c3c"}}>{vendor.mustHave?"✓ Must-Haves":"✗ Must-Haves"}</span>
             <span style={{fontSize:12,color:STAGE_COLORS[vendor.pipelineStage||"Identified"]}}>{vendor.pipelineStage||"Identified"}</span>
@@ -327,18 +327,18 @@ function SwipeCard({vendor,onPass,onProceed,onEdit}) {
       </div>
       <div style={{display:"flex",gap:6,marginTop:14}}>
         {[["DNA",vendor.fiserDNA],["NCUA",vendor.ncuaCompliance],["Alkami",vendor.alkami],["Merit.",vendor.meridianLink],["Intl",vendor.internationalSupport],["Dept",vendor.departmentFit]].map(([lbl,val])=>(
-          <div key={lbl} style={{flex:1,textAlign:"center",background:"var(--bg-hover)",borderRadius:6,padding:"4px 0"}}>
+          <div key={lbl} style={{flex:1,textAlign:"center",background:"rgba(255,255,255,0.04)",borderRadius:6,padding:"4px 0"}}>
             <div style={{fontSize:13,fontWeight:700,color:val>=4?"#00d4aa":val>=3?"#ffd93d":"#e74c3c"}}>{val}</div>
-            <div style={{fontSize:9,color:"var(--text-dim)"}}>{lbl}</div>
+            <div style={{fontSize:9,color:"#334"}}>{lbl}</div>
           </div>
         ))}
       </div>
       <div style={{display:"flex",gap:8,marginTop:14,justifyContent:"center"}}>
         <button onClick={()=>onPass(vendor)} style={{flex:1,padding:"10px",background:"rgba(231,76,60,0.1)",border:"1px solid rgba(231,76,60,0.3)",borderRadius:10,color:"#e74c3c",fontSize:14,cursor:"pointer",fontWeight:600,minHeight:44}}>✗ Pass</button>
-        <button onClick={()=>onEdit(vendor)} style={{padding:"10px 16px",background:"var(--bg-input)",border:"1px solid var(--border)",borderRadius:10,color:"var(--text-faint)",fontSize:13,cursor:"pointer",minHeight:44}}>Edit</button>
+        <button onClick={()=>onEdit(vendor)} style={{padding:"10px 16px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,color:"#889",fontSize:13,cursor:"pointer",minHeight:44}}>Edit</button>
         <button onClick={()=>onProceed(vendor)} style={{flex:1,padding:"10px",background:"rgba(0,212,170,0.1)",border:"1px solid rgba(0,212,170,0.3)",borderRadius:10,color:"#00d4aa",fontSize:14,cursor:"pointer",fontWeight:600,minHeight:44}}>✓ Proceed</button>
       </div>
-      <div style={{textAlign:"center",marginTop:10,fontSize:11,color:"var(--text-dim)"}}>← swipe to pass · swipe to proceed →</div>
+      <div style={{textAlign:"center",marginTop:10,fontSize:11,color:"#334"}}>← swipe to pass · swipe to proceed →</div>
     </div>
   );
 }
@@ -365,10 +365,10 @@ function CompareView({vendors,weights,mustHaves,onClose}) {
   return (
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-        <h2 style={{color:"var(--text-primary)",fontFamily:"Georgia,serif",margin:0}}>Side-by-Side Comparison</h2>
-        <button onClick={onClose} style={{background:"none",border:"none",color:"var(--text-dim)",fontSize:22,cursor:"pointer"}}>✕</button>
+        <h2 style={{color:"#fff",fontFamily:"Georgia,serif",margin:0}}>Side-by-Side Comparison</h2>
+        <button onClick={onClose} style={{background:"none",border:"none",color:"#556",fontSize:22,cursor:"pointer"}}>✕</button>
       </div>
-      <p style={{color:"var(--text-dim)",fontSize:13,marginBottom:16}}>Select up to 3 vendors to compare head-to-head.</p>
+      <p style={{color:"#556",fontSize:13,marginBottom:16}}>Select up to 3 vendors to compare head-to-head.</p>
       <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:24}}>
         {vendors.map(v=>(
           <button key={v.id} onClick={()=>toggle(v)} style={{
@@ -384,11 +384,11 @@ function CompareView({vendors,weights,mustHaves,onClose}) {
           <table style={{width:"100%",borderCollapse:"collapse",minWidth:400}}>
             <thead>
               <tr>
-                <th style={{textAlign:"left",padding:"10px 12px",fontSize:11,color:"var(--text-dim)",textTransform:"uppercase",borderBottom:"1px solid var(--border-subtle)"}}>Criteria</th>
+                <th style={{textAlign:"left",padding:"10px 12px",fontSize:11,color:"#446",textTransform:"uppercase",borderBottom:"1px solid rgba(255,255,255,0.08)"}}>Criteria</th>
                 {selected.map(v=>(
-                  <th key={v.id} style={{textAlign:"center",padding:"10px 12px",fontSize:14,color:"var(--text-primary)",fontWeight:700,borderBottom:"1px solid var(--border-subtle)"}}>
+                  <th key={v.id} style={{textAlign:"center",padding:"10px 12px",fontSize:14,color:"#fff",fontWeight:700,borderBottom:"1px solid rgba(255,255,255,0.08)"}}>
                     {v.fintechName}
-                    <div style={{fontSize:11,color:"var(--text-dim)",fontWeight:400,marginTop:2}}>{(v.departmentFocus||[]).slice(0,1).join(", ")}</div>
+                    <div style={{fontSize:11,color:"#556",fontWeight:400,marginTop:2}}>{(v.departmentFocus||[]).slice(0,1).join(", ")}</div>
                   </th>
                 ))}
               </tr>
@@ -398,8 +398,8 @@ function CompareView({vendors,weights,mustHaves,onClose}) {
                 const vals=selected.map(v=>f.key==="effortAdj"?v.effortAdj||0:f.key==="weighted"?v.weighted||0:f.key==="mustHave"?v.mustHave:v[f.key]||0);
                 const best=f.key==="implementationEffort"?Math.min(...vals.filter(v=>typeof v==="number")):Math.max(...vals.filter(v=>typeof v==="number"));
                 return (
-                  <tr key={f.key} style={{borderBottom:"1px solid var(--border-subtle)"}}>
-                    <td style={{padding:"10px 12px",fontSize:13,color:"var(--text-muted)"}}>{f.label}</td>
+                  <tr key={f.key} style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                    <td style={{padding:"10px 12px",fontSize:13,color:"#8899aa"}}>{f.label}</td>
                     {selected.map((v,i)=>{
                       const val=vals[i];
                       const isBest=typeof val==="number"?val===best:false;
@@ -420,9 +420,9 @@ function CompareView({vendors,weights,mustHaves,onClose}) {
           </table>
         </div>
       ):(
-        <div style={{textAlign:"center",padding:40,color:"var(--text-dim)"}}>
+        <div style={{textAlign:"center",padding:40,color:"#334"}}>
           <div style={{fontSize:32,marginBottom:8}}>⚖️</div>
-          <div style={{fontSize:14,color:"var(--text-dim)"}}>Select at least 2 vendors above to compare</div>
+          <div style={{fontSize:14,color:"#556"}}>Select at least 2 vendors above to compare</div>
         </div>
       )}
     </div>
@@ -467,23 +467,23 @@ function WeightsEditor({weights,weightLabels,onChange,onLabelsChange,mustHaves,o
   return (
     <div style={{maxWidth:720}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-        <h2 style={{color:"var(--text-primary)",fontFamily:"Georgia,serif",margin:0}}>Scoring Weights & Must-Haves</h2>
+        <h2 style={{color:"#fff",fontFamily:"Georgia,serif",margin:0}}>Scoring Weights & Must-Haves</h2>
         <div style={{fontSize:13,color:Math.abs(total-100)<1?"#2ecc71":"#e74c3c",fontWeight:700}}>
           Total: {total}% {Math.abs(total-100)>=1&&"⚠ Must = 100%"}
         </div>
       </div>
-      <p style={{color:"var(--text-dim)",fontSize:13,marginBottom:20}}>Edit field names, adjust weights, set must-have minimums, or add/remove criteria. Weights must total 100%.</p>
+      <p style={{color:"#556",fontSize:13,marginBottom:20}}>Edit field names, adjust weights, set must-have minimums, or add/remove criteria. Weights must total 100%.</p>
 
       {/* Column Headers */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 90px 80px 80px 36px",gap:8,marginBottom:8,padding:"0 4px"}}>
         {["Criteria Name","Weight %","Slider","Must-Have Min",""].map(h=>(
-          <div key={h} style={{fontSize:10,color:"var(--text-dim)",textTransform:"uppercase",letterSpacing:"0.08em"}}>{h}</div>
+          <div key={h} style={{fontSize:10,color:"#445",textTransform:"uppercase",letterSpacing:"0.08em"}}>{h}</div>
         ))}
       </div>
 
       {/* Rows */}
       {keys.map(k=>(
-        <div key={k} style={{display:"grid",gridTemplateColumns:"1fr 90px 80px 80px 36px",gap:8,alignItems:"center",marginBottom:12,padding:"10px 10px",background:"var(--bg-card)",borderRadius:8,border:"1px solid var(--border-subtle)"}}>
+        <div key={k} style={{display:"grid",gridTemplateColumns:"1fr 90px 80px 80px 36px",gap:8,alignItems:"center",marginBottom:12,padding:"10px 10px",background:"rgba(255,255,255,0.03)",borderRadius:8,border:"1px solid rgba(255,255,255,0.06)"}}>
           {/* Label */}
           <div>
             {editingLabel===k?(
@@ -492,8 +492,8 @@ function WeightsEditor({weights,weightLabels,onChange,onLabelsChange,mustHaves,o
                 style={{...css.input,fontSize:13,padding:"4px 8px",border:"1px solid rgba(0,212,170,0.4)"}}/>
             ):(
               <div style={{display:"flex",alignItems:"center",gap:6}}>
-                <span style={{fontSize:13,color:"var(--text-primary)"}}>{weightLabels[k]||k}</span>
-                <button onClick={()=>startRename(k)} title="Rename" style={{background:"none",border:"none",color:"var(--text-dim)",cursor:"pointer",fontSize:12,padding:"2px 4px",lineHeight:1}}>✎</button>
+                <span style={{fontSize:13,color:"#c8d8e8"}}>{weightLabels[k]||k}</span>
+                <button onClick={()=>startRename(k)} title="Rename" style={{background:"none",border:"none",color:"#445",cursor:"pointer",fontSize:12,padding:"2px 4px",lineHeight:1}}>✎</button>
               </div>
             )}
           </div>
@@ -501,8 +501,8 @@ function WeightsEditor({weights,weightLabels,onChange,onLabelsChange,mustHaves,o
           {/* Weight number input */}
           <div style={{display:"flex",alignItems:"center",gap:4}}>
             <input type="number" min="0" max="100" value={weights[k]} onChange={e=>setW(k,e.target.value)}
-              style={{width:52,background:"var(--bg-input)",border:"1px solid var(--border)",borderRadius:4,padding:"4px 6px",color:"#00d4aa",fontSize:13,fontWeight:700,textAlign:"center"}}/>
-            <span style={{fontSize:11,color:"var(--text-dim)"}}>%</span>
+              style={{width:52,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:4,padding:"4px 6px",color:"#00d4aa",fontSize:13,fontWeight:700,textAlign:"center"}}/>
+            <span style={{fontSize:11,color:"#445"}}>%</span>
           </div>
 
           {/* Slider */}
@@ -531,7 +531,7 @@ function WeightsEditor({weights,weightLabels,onChange,onLabelsChange,mustHaves,o
 
       {/* Add new field */}
       <div style={{padding:16,background:"rgba(0,212,170,0.04)",border:"1px dashed rgba(0,212,170,0.2)",borderRadius:10}}>
-        <div style={{fontSize:12,color:"var(--text-muted)",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Add New Scoring Criteria</div>
+        <div style={{fontSize:12,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Add New Scoring Criteria</div>
         <div style={{display:"flex",gap:8}}>
           <input value={newFieldName} onChange={e=>setNewFieldName(e.target.value)}
             onKeyDown={e=>{if(e.key==="Enter")addField();}}
@@ -539,11 +539,11 @@ function WeightsEditor({weights,weightLabels,onChange,onLabelsChange,mustHaves,o
             style={{...css.input,flex:1,border:"1px solid rgba(0,212,170,0.3)"}}/>
           <button onClick={addField} style={{padding:"8px 18px",background:"#00d4aa",border:"none",borderRadius:6,color:"#000",fontWeight:700,cursor:"pointer",fontSize:14,whiteSpace:"nowrap",minHeight:44}}>+ Add</button>
         </div>
-        <div style={{fontSize:11,color:"var(--text-dim)",marginTop:6}}>New criteria start at 0% weight and no must-have. Adjust above after adding.</div>
+        <div style={{fontSize:11,color:"#334",marginTop:6}}>New criteria start at 0% weight and no must-have. Adjust above after adding.</div>
       </div>
 
-      <div style={{marginTop:16,padding:12,background:"var(--bg-card)",border:"1px solid var(--border-subtle)",borderRadius:8}}>
-        <div style={{fontSize:11,color:"var(--text-dim)"}}>💡 <strong style={{color:"var(--text-faint)"}}>Must-Have Min:</strong> Off = not required. ≥2–5 = vendor must score at least that value to pass the must-haves gate. The ✗ flag appears on any vendor that fails.</div>
+      <div style={{marginTop:16,padding:12,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:8}}>
+        <div style={{fontSize:11,color:"#445"}}>💡 <strong style={{color:"#889"}}>Must-Have Min:</strong> Off = not required. ≥2–5 = vendor must score at least that value to pass the must-haves gate. The ✗ flag appears on any vendor that fails.</div>
       </div>
     </div>
   );
@@ -734,7 +734,7 @@ Research this vendor across the web (website, press releases, fintech databases,
       <div style={{marginBottom:20,padding:14,background:"rgba(255,215,61,0.04)",border:"1px solid rgba(255,215,61,0.18)",borderRadius:10}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
           <div style={{fontSize:11,color:"#ffd93d",textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600}}>📝 Scratch Pad — Raw Booth Notes</div>
-          <div style={{fontSize:10,color:"var(--text-dim)"}}>Type anything. The AI agent will use this as context.</div>
+          <div style={{fontSize:10,color:"#445"}}>Type anything. The AI agent will use this as context.</div>
         </div>
         <textarea
           value={form.noteRawScratch||""}
@@ -765,17 +765,17 @@ Research this vendor across the web (website, press releases, fintech databases,
               :<>✨ AI Research &amp; Fill</>}
           </button>
 
-          <label style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"var(--text-faint)",cursor:"pointer",userSelect:"none"}}>
+          <label style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"#667",cursor:"pointer",userSelect:"none"}}>
             <input type="checkbox" checked={overwriteAll} onChange={e=>setOverwriteAll(e.target.checked)}
               style={{accentColor:"#00d4aa",width:14,height:14}}/>
             Overwrite existing fields
           </label>
 
-          {!hasName&&<span style={{fontSize:12,color:"var(--text-dim)"}}>Enter a Fintech Name on the Basic tab first</span>}
+          {!hasName&&<span style={{fontSize:12,color:"#445"}}>Enter a Fintech Name on the Basic tab first</span>}
 
           {(aiStatus==="done"||aiStatus==="error")&&(
             <button onClick={()=>setShowLog(v=>!v)}
-              style={{marginLeft:"auto",background:"none",border:"none",color:"var(--text-dim)",fontSize:12,cursor:"pointer",padding:"4px 8px"}}>
+              style={{marginLeft:"auto",background:"none",border:"none",color:"#445",fontSize:12,cursor:"pointer",padding:"4px 8px"}}>
               {showLog?"Hide":"Show"} log
             </button>
           )}
@@ -794,7 +794,7 @@ Research this vendor across the web (website, press releases, fintech databases,
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
           {NOTE_FIELDS.map(({key,label,placeholder})=>(
             <div key={key} style={{gridColumn:key==="notePitchSummary"||key==="noteRedFlags"||key==="noteFollowUp"?"1/-1":"auto"}}>
-              <label style={{...css.label,color:"var(--text-muted)"}}>{label}</label>
+              <label style={{...css.label,color:"#7799aa"}}>{label}</label>
               <textarea value={form[key]||""} onChange={e=>set(key,e.target.value)}
                 rows={key==="notePitchSummary"?3:2}
                 placeholder={placeholder}
@@ -830,27 +830,17 @@ Research this vendor across the web (website, press releases, fintech databases,
 
       {(form.noteHistory||[]).length>0&&(
         <div style={{marginTop:16}}>
-          <div style={{fontSize:11,color:"var(--text-muted)",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Note History</div>
+          <div style={{fontSize:11,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Note History</div>
           {[...form.noteHistory].reverse().map((n,i)=>(
-            <div key={i} style={{padding:"10px 14px",background:"var(--bg-card)",borderRadius:8,marginBottom:8,borderLeft:"3px solid rgba(0,212,170,0.3)"}}>
-              <div style={{fontSize:10,color:"var(--text-dim)",marginBottom:4}}>{new Date(n.ts).toLocaleString()}</div>
-              <div style={{fontSize:13,color:"var(--text-secondary)"}}>{n.text}</div>
+            <div key={i} style={{padding:"10px 14px",background:"rgba(255,255,255,0.03)",borderRadius:8,marginBottom:8,borderLeft:"3px solid rgba(0,212,170,0.3)"}}>
+              <div style={{fontSize:10,color:"#445",marginBottom:4}}>{new Date(n.ts).toLocaleString()}</div>
+              <div style={{fontSize:13,color:"#aabbcc"}}>{n.text}</div>
             </div>
           ))}
         </div>
       )}
 
-      <style>{`
-        @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-        html{transition:background 0.25s,color 0.25s;}
-        input,textarea,select{
-          background:var(--bg-input)!important;
-          color:var(--text-primary)!important;
-          border-color:var(--border)!important;
-        }
-        input::placeholder,textarea::placeholder{color:var(--text-faint)!important;}
-        option{background:var(--select-bg);color:var(--text-primary);}
-      `}</style>
+      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 }
@@ -977,8 +967,8 @@ function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartme
   return (
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-        <h2 style={{color:"var(--text-primary)",fontSize:20,margin:0,fontFamily:"Georgia,serif"}}>{form.id?"Edit Fintech":quickMode?"⚡ Quick Entry":"Log New Fintech"}</h2>
-        <button onClick={onClose} style={{background:"none",border:"none",color:"var(--text-dim)",fontSize:24,cursor:"pointer",minWidth:44,minHeight:44}}>✕</button>
+        <h2 style={{color:"#fff",fontSize:20,margin:0,fontFamily:"Georgia,serif"}}>{form.id?"Edit Fintech":quickMode?"⚡ Quick Entry":"Log New Fintech"}</h2>
+        <button onClick={onClose} style={{background:"none",border:"none",color:"#556",fontSize:24,cursor:"pointer",minWidth:44,minHeight:44}}>✕</button>
       </div>
 
       {/* Live Score */}
@@ -991,13 +981,13 @@ function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartme
         ].map(({label,value,color})=>(
           <div key={label} style={{textAlign:"center"}}>
             <div style={{fontSize:20,fontWeight:700,color}}>{value}</div>
-            <div style={{fontSize:10,color:"var(--text-dim)",textTransform:"uppercase",letterSpacing:"0.08em"}}>{label}</div>
+            <div style={{fontSize:10,color:"#556",textTransform:"uppercase",letterSpacing:"0.08em"}}>{label}</div>
           </div>
         ))}
       </div>
 
       {/* Tabs */}
-      <div style={{display:"flex",gap:4,marginBottom:20,borderBottom:"1px solid var(--border-subtle)",paddingBottom:12,overflowX:"auto"}}>
+      <div style={{display:"flex",gap:4,marginBottom:20,borderBottom:"1px solid rgba(255,255,255,0.06)",paddingBottom:12,overflowX:"auto"}}>
         {tabs.map(t=>(
           <button key={t} onClick={()=>setTab(t)} style={{
             padding:"8px 16px",border:"none",borderRadius:8,
@@ -1017,9 +1007,9 @@ function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartme
               <div style={{marginTop:6,padding:"8px 12px",background:"rgba(255,215,61,0.08)",border:"1px solid rgba(255,215,61,0.3)",borderRadius:6}}>
                 <div style={{fontSize:11,color:"#ffd93d",fontWeight:600,marginBottom:4}}>⚠ Possible duplicate{liveDupes.length>1?"s":""} found</div>
                 {liveDupes.slice(0,3).map((d,i)=>(
-                  <div key={i} style={{fontSize:12,color:"var(--text-secondary)",marginBottom:2}}>
-                    <span style={{color:"var(--text-primary)",fontWeight:600}}>{d.vendor.fintechName}</span>
-                    <span style={{color:"var(--text-dim)",marginLeft:6}}>({d.reason} · {Math.round(d.score*100)}% match · {d.vendor.conference||"no conference"})</span>
+                  <div key={i} style={{fontSize:12,color:"#aabbcc",marginBottom:2}}>
+                    <span style={{color:"#fff",fontWeight:600}}>{d.vendor.fintechName}</span>
+                    <span style={{color:"#556",marginLeft:6}}>({d.reason} · {Math.round(d.score*100)}% match · {d.vendor.conference||"no conference"})</span>
                   </div>
                 ))}
               </div>
@@ -1058,7 +1048,7 @@ function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartme
                 {folders.map(f=><option key={f.id} value={f.id}>{f.name}</option>)}
               </select>
             </div>
-            {folders.length===0&&<div style={{fontSize:11,color:"var(--text-dim)",marginTop:4}}>Create folders in the Folders view to organize fintechs by problem/theme.</div>}
+            {folders.length===0&&<div style={{fontSize:11,color:"#334",marginTop:4}}>Create folders in the Folders view to organize fintechs by problem/theme.</div>}
           </div>
         </div>
       )}
@@ -1071,7 +1061,7 @@ function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartme
               <div style={{fontSize:12,color:"#00d4aa",fontWeight:600}}>
                 {form.vendorWeights ? "📌 This vendor has its own scoring model" : "📋 Using global scoring model — edits apply to this vendor only"}
               </div>
-              <div style={{fontSize:11,color:"var(--text-dim)",marginTop:2}}>
+              <div style={{fontSize:11,color:"#445",marginTop:2}}>
                 Rename criteria, adjust weights, set must-haves, or add/remove fields. Changes are saved with this vendor only and do not affect the global model.
               </div>
             </div>
@@ -1088,7 +1078,7 @@ function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartme
                 <span style={{fontSize:12,color:Math.abs(tot-100)<1?"#00d4aa":"#e74c3c",fontWeight:600}}>
                   {Math.abs(tot-100)<1?"✓ Weights total 100%":`⚠ Weights total ${tot}% — must equal 100%`}
                 </span>
-                <span style={{fontSize:11,color:"var(--text-dim)"}}>Scoring criteria: {Object.keys(activeWeights).length}</span>
+                <span style={{fontSize:11,color:"#445"}}>Scoring criteria: {Object.keys(activeWeights).length}</span>
               </div>
             );
           })()}
@@ -1096,7 +1086,7 @@ function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartme
           {/* Column headers */}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 72px 60px 72px 32px",gap:6,marginBottom:6,padding:"0 6px"}}>
             {["Criteria Name","Rating (1–5)","Weight %","Slider","Must-Have",""].map(h=>(
-              <div key={h} style={{fontSize:9,color:"var(--text-dim)",textTransform:"uppercase",letterSpacing:"0.07em"}}>{h}</div>
+              <div key={h} style={{fontSize:9,color:"#445",textTransform:"uppercase",letterSpacing:"0.07em"}}>{h}</div>
             ))}
           </div>
 
@@ -1104,7 +1094,7 @@ function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartme
           {Object.keys(activeWeights).map(k=>{
             const isEditingLabel = vendorEditingLabel===k;
             return (
-              <div key={k} style={{display:"grid",gridTemplateColumns:"1fr 1fr 72px 60px 72px 32px",gap:6,alignItems:"center",marginBottom:8,padding:"8px 8px",background:"var(--bg-card)",borderRadius:8,border:"1px solid var(--border-subtle)"}}>
+              <div key={k} style={{display:"grid",gridTemplateColumns:"1fr 1fr 72px 60px 72px 32px",gap:6,alignItems:"center",marginBottom:8,padding:"8px 8px",background:"rgba(255,255,255,0.03)",borderRadius:8,border:"1px solid rgba(255,255,255,0.06)"}}>
 
                 {/* Editable label */}
                 <div>
@@ -1116,9 +1106,9 @@ function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartme
                       style={{...css.input,fontSize:12,padding:"4px 8px",border:"1px solid rgba(0,212,170,0.5)"}}/>
                   ) : (
                     <div style={{display:"flex",alignItems:"center",gap:4}}>
-                      <span style={{fontSize:13,color:"var(--text-primary)",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{(activeWeightLabels||{})[k]||k}</span>
+                      <span style={{fontSize:13,color:"#c8d8e8",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{(activeWeightLabels||{})[k]||k}</span>
                       <button onClick={()=>{setVendorEditingLabel(k);setVendorEditingLabelVal((activeWeightLabels||{})[k]||k);}}
-                        style={{background:"none",border:"none",color:"var(--text-dim)",cursor:"pointer",fontSize:11,padding:"2px",flexShrink:0}} title="Rename">✎</button>
+                        style={{background:"none",border:"none",color:"#445",cursor:"pointer",fontSize:11,padding:"2px",flexShrink:0}} title="Rename">✎</button>
                     </div>
                   )}
                 </div>
@@ -1128,7 +1118,7 @@ function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartme
                   {[1,2,3,4,5].map(n=>(
                     <button key={n} onClick={()=>set(k,n)} style={{
                       flex:1,padding:"5px 0",border:"1px solid",fontSize:12,cursor:"pointer",borderRadius:4,
-                      borderColor:form[k]===n||(!form[k]&&n===3)?"#00d4aa":"var(--border)",
+                      borderColor:form[k]===n||(!form[k]&&n===3)?"#00d4aa":"rgba(255,255,255,0.1)",
                       background:form[k]===n||(!form[k]&&n===3)?"rgba(0,212,170,0.15)":"rgba(255,255,255,0.03)",
                       color:form[k]===n||(!form[k]&&n===3)?"#00d4aa":"#667",
                       fontWeight:form[k]===n||(!form[k]&&n===3)?700:400,
@@ -1142,8 +1132,8 @@ function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartme
                   <input type="number" min="0" max="100"
                     value={activeWeights[k]||0}
                     onChange={e=>updateVendorWeight(k,e.target.value)}
-                    style={{width:44,background:"var(--bg-input)",border:"1px solid var(--border)",borderRadius:4,padding:"4px 4px",color:"#00d4aa",fontSize:12,fontWeight:700,textAlign:"center"}}/>
-                  <span style={{fontSize:10,color:"var(--text-dim)"}}>%</span>
+                    style={{width:44,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:4,padding:"4px 4px",color:"#00d4aa",fontSize:12,fontWeight:700,textAlign:"center"}}/>
+                  <span style={{fontSize:10,color:"#445"}}>%</span>
                 </div>
 
                 {/* Slider */}
@@ -1173,7 +1163,7 @@ function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartme
 
           {/* Add new criteria */}
           <div style={{padding:12,background:"rgba(0,212,170,0.04)",border:"1px dashed rgba(0,212,170,0.2)",borderRadius:8}}>
-            <div style={{fontSize:11,color:"var(--text-muted)",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Add Criteria to This Vendor</div>
+            <div style={{fontSize:11,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Add Criteria to This Vendor</div>
             <div style={{display:"flex",gap:6}}>
               <input value={newVendorCriteria} onChange={e=>setNewVendorCriteria(e.target.value)}
                 onKeyDown={e=>{if(e.key==="Enter")addVendorCriteria();}}
@@ -1182,7 +1172,7 @@ function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartme
               <button onClick={addVendorCriteria}
                 style={{padding:"8px 14px",background:"#00d4aa",border:"none",borderRadius:6,color:"#000",fontWeight:700,cursor:"pointer",fontSize:13,whiteSpace:"nowrap",minHeight:44}}>+ Add</button>
             </div>
-            <div style={{fontSize:10,color:"var(--text-dim)",marginTop:4}}>New criteria are added to this vendor only. To add globally, use the Weights tab.</div>
+            <div style={{fontSize:10,color:"#334",marginTop:4}}>New criteria are added to this vendor only. To add globally, use the Weights tab.</div>
           </div>
         </div>
       )}
@@ -1213,7 +1203,7 @@ function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartme
       )}
 
       {/* Autosave status bar */}
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:20,paddingTop:14,borderTop:"1px solid var(--border-subtle)"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:20,paddingTop:14,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           {autoSaveStatus==="pending"&&(
             <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"#ffd93d"}}>
@@ -1232,14 +1222,14 @@ function EntryForm({initial,onSave,onClose,departments,conferences,onAddDepartme
             </div>
           )}
           {autoSaveStatus==="idle"&&form.fintechName&&(
-            <div style={{fontSize:11,color:"var(--text-dim)"}}>Autosaves 10s after each change</div>
+            <div style={{fontSize:11,color:"#334"}}>Autosaves 10s after each change</div>
           )}
           {!form.fintechName&&(
-            <div style={{fontSize:11,color:"var(--text-dim)"}}>Enter a Fintech Name to enable autosave</div>
+            <div style={{fontSize:11,color:"#334"}}>Enter a Fintech Name to enable autosave</div>
           )}
         </div>
         <div style={{display:"flex",gap:10}}>
-          <button onClick={onClose} style={{padding:"12px 20px",background:"none",border:"1px solid var(--border)",color:"var(--text-faint)",borderRadius:8,cursor:"pointer",fontSize:15,minHeight:48}}>
+          <button onClick={onClose} style={{padding:"12px 20px",background:"none",border:"1px solid rgba(255,255,255,0.15)",color:"#889",borderRadius:8,cursor:"pointer",fontSize:15,minHeight:48}}>
             {form.id?"Close":"Cancel"}
           </button>
           <button onClick={()=>{
@@ -1298,62 +1288,62 @@ function TrendAnalysis({vendors}) {
     return Object.entries(map);
   },[vendors]);
 
-  if(!vendors.length) return <div style={{textAlign:"center",padding:80,color:"var(--text-dim)"}}><div style={{fontSize:40,marginBottom:12}}>📈</div><div style={{fontSize:16,color:"var(--text-dim)"}}>No data yet — log some vendors first</div></div>;
+  if(!vendors.length) return <div style={{textAlign:"center",padding:80,color:"#334"}}><div style={{fontSize:40,marginBottom:12}}>📈</div><div style={{fontSize:16,color:"#556"}}>No data yet — log some vendors first</div></div>;
 
   return (
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
       <div style={css.card}>
-        <h3 style={{margin:"0 0 16px",fontSize:13,color:"var(--text-muted)",textTransform:"uppercase",letterSpacing:"0.1em"}}>By Conference</h3>
+        <h3 style={{margin:"0 0 16px",fontSize:13,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.1em"}}>By Conference</h3>
         {byConf.map(c=>(
           <div key={c.conf} style={{marginBottom:14}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-              <span style={{fontSize:13,color:"var(--text-primary)",fontWeight:600}}>{c.conf}</span>
+              <span style={{fontSize:13,color:"#fff",fontWeight:600}}>{c.conf}</span>
               <span style={{fontSize:13,color:"#00d4aa",fontWeight:700}}>{c.avg}</span>
             </div>
             <ScoreBar value={parseFloat(c.avg)} max={5}/>
-            <div style={{fontSize:11,color:"var(--text-dim)",marginTop:3}}>{c.total} vendors · {c.passRate}% pass rate</div>
+            <div style={{fontSize:11,color:"#445",marginTop:3}}>{c.total} vendors · {c.passRate}% pass rate</div>
           </div>
         ))}
       </div>
       <div style={css.card}>
-        <h3 style={{margin:"0 0 16px",fontSize:13,color:"var(--text-muted)",textTransform:"uppercase",letterSpacing:"0.1em"}}>By Department</h3>
+        <h3 style={{margin:"0 0 16px",fontSize:13,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.1em"}}>By Department</h3>
         {byDept.map(d=>(
           <div key={d.dept} style={{marginBottom:14}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-              <span style={{fontSize:13,color:"var(--text-primary)"}}>{d.dept}</span>
+              <span style={{fontSize:13,color:"#fff"}}>{d.dept}</span>
               <span style={{fontSize:13,color:"#4db8ff",fontWeight:700}}>{d.avg}</span>
             </div>
             <ScoreBar value={parseFloat(d.avg)} max={5} color="#4db8ff"/>
-            <div style={{fontSize:11,color:"var(--text-dim)",marginTop:3}}>{d.total} vendors</div>
+            <div style={{fontSize:11,color:"#445",marginTop:3}}>{d.total} vendors</div>
           </div>
         ))}
       </div>
       <div style={css.card}>
-        <h3 style={{margin:"0 0 16px",fontSize:13,color:"var(--text-muted)",textTransform:"uppercase",letterSpacing:"0.1em"}}>Pipeline Stages</h3>
+        <h3 style={{margin:"0 0 16px",fontSize:13,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.1em"}}>Pipeline Stages</h3>
         <div style={{display:"flex",flexWrap:"wrap",gap:10}}>
           {PIPELINE_STAGES.map(stage=>{
             const count=stageBreakdown.find(([s])=>s===stage)?.[1]||0;
             return (
               <div key={stage} style={{flex:"1 1 100px",padding:"12px 10px",background:`${STAGE_COLORS[stage]}11`,border:`1px solid ${STAGE_COLORS[stage]}33`,borderRadius:8,textAlign:"center"}}>
                 <div style={{fontSize:22,fontWeight:700,color:STAGE_COLORS[stage]}}>{count}</div>
-                <div style={{fontSize:11,color:"var(--text-dim)",marginTop:2}}>{stage}</div>
+                <div style={{fontSize:11,color:"#556",marginTop:2}}>{stage}</div>
               </div>
             );
           })}
         </div>
       </div>
       <div style={css.card}>
-        <h3 style={{margin:"0 0 16px",fontSize:13,color:"var(--text-muted)",textTransform:"uppercase",letterSpacing:"0.1em"}}>Grade Distribution</h3>
+        <h3 style={{margin:"0 0 16px",fontSize:13,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.1em"}}>Grade Distribution</h3>
         {GRADES.slice(0,-1).map((g,gi)=>{
           const count=vendors.filter(v=>(v.effortAdj||0)>=g.min&&(v.effortAdj||0)<(GRADES[gi-1]?.min??99)).length;
           const pct=vendors.length?Math.round(count/vendors.length*100):0;
           return (
             <div key={g.grade} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
               <span style={{width:28,fontSize:13,fontWeight:700,color:g.color}}>{g.grade}</span>
-              <div style={{flex:1,height:8,background:"var(--bg-hover)",borderRadius:4,overflow:"hidden"}}>
+              <div style={{flex:1,height:8,background:"rgba(255,255,255,0.06)",borderRadius:4,overflow:"hidden"}}>
                 <div style={{width:`${pct}%`,height:"100%",background:g.color,borderRadius:4,transition:"width 0.5s"}}/>
               </div>
-              <span style={{fontSize:12,color:"var(--text-dim)",minWidth:24}}>{count}</span>
+              <span style={{fontSize:12,color:"#445",minWidth:24}}>{count}</span>
             </div>
           );
         })}
@@ -1379,8 +1369,8 @@ function BoardSummary({vendors}) {
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
         <div>
-          <h2 style={{color:"var(--text-primary)",fontFamily:"Georgia,serif",margin:"0 0 4px"}}>Board Summary</h2>
-          <div style={{fontSize:13,color:"var(--text-dim)"}}>Executive overview · {new Date().toLocaleDateString()}</div>
+          <h2 style={{color:"#fff",fontFamily:"Georgia,serif",margin:"0 0 4px"}}>Board Summary</h2>
+          <div style={{fontSize:13,color:"#445"}}>Executive overview · {new Date().toLocaleDateString()}</div>
         </div>
         <button onClick={()=>window.print()} style={{padding:"8px 16px",background:"rgba(0,212,170,0.1)",border:"1px solid rgba(0,212,170,0.3)",borderRadius:6,color:"#00d4aa",cursor:"pointer",fontSize:13,minHeight:44}}>🖨 Print</button>
       </div>
@@ -1393,24 +1383,24 @@ function BoardSummary({vendors}) {
         ].map(({label,value,color})=>(
           <div key={label} style={{...css.card,textAlign:"center"}}>
             <div style={{fontSize:28,fontWeight:700,color,fontFamily:"Georgia,serif"}}>{value}</div>
-            <div style={{fontSize:11,color:"var(--text-dim)",textTransform:"uppercase",letterSpacing:"0.08em",marginTop:4}}>{label}</div>
+            <div style={{fontSize:11,color:"#556",textTransform:"uppercase",letterSpacing:"0.08em",marginTop:4}}>{label}</div>
           </div>
         ))}
       </div>
       <div style={{...css.card,marginBottom:20}}>
-        <h3 style={{margin:"0 0 16px",fontSize:13,color:"var(--text-muted)",textTransform:"uppercase",letterSpacing:"0.1em"}}>Top 5 Strategic Opportunities</h3>
+        <h3 style={{margin:"0 0 16px",fontSize:13,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.1em"}}>Top 5 Strategic Opportunities</h3>
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",minWidth:500}}>
-            <thead><tr style={{borderBottom:"1px solid var(--border-subtle)"}}>
+            <thead><tr style={{borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
               {["#","Fintech","Departments","Score","Grade","Priority","Stage","Must-Haves"].map(h=>(
-                <th key={h} style={{textAlign:"left",padding:"4px 8px 10px",fontSize:10,color:"var(--text-dim)",textTransform:"uppercase"}}>{h}</th>
+                <th key={h} style={{textAlign:"left",padding:"4px 8px 10px",fontSize:10,color:"#446",textTransform:"uppercase"}}>{h}</th>
               ))}
             </tr></thead>
             <tbody>{top5.map((v,i)=>(
-              <tr key={v.id} style={{borderBottom:"1px solid var(--border-subtle)"}}>
+              <tr key={v.id} style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
                 <td style={{padding:"10px 8px",fontSize:13,color:"#00d4aa",fontWeight:700}}>#{i+1}</td>
-                <td style={{fontSize:13,color:"var(--text-primary)",fontWeight:600,padding:"10px 8px"}}>{v.fintechName}</td>
-                <td style={{fontSize:12,color:"var(--text-muted)",padding:"10px 8px"}}>{(v.departmentFocus||[]).join(", ")}</td>
+                <td style={{fontSize:13,color:"#fff",fontWeight:600,padding:"10px 8px"}}>{v.fintechName}</td>
+                <td style={{fontSize:12,color:"#8899aa",padding:"10px 8px"}}>{(v.departmentFocus||[]).join(", ")}</td>
                 <td style={{fontSize:13,color:"#00d4aa",fontWeight:700,padding:"10px 8px"}}>{(v.effortAdj||0).toFixed(2)}</td>
                 <td style={{padding:"10px 8px"}}><span style={{padding:"2px 8px",borderRadius:4,background:`${getGrade(v.effortAdj||0).color}22`,color:getGrade(v.effortAdj||0).color,fontSize:12,fontWeight:700}}>{getGrade(v.effortAdj||0).grade}</span></td>
                 <td style={{padding:"10px 8px",fontSize:12,color:pColor[v.strategicPriority]}}>{v.strategicPriority}</td>
@@ -1427,7 +1417,7 @@ function BoardSummary({vendors}) {
           <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
             {redFlags.map(v=>(
               <div key={v.id} style={{padding:"8px 14px",background:"rgba(231,76,60,0.08)",border:"1px solid rgba(231,76,60,0.2)",borderRadius:8}}>
-                <div style={{fontSize:13,color:"var(--text-primary)",fontWeight:600}}>{v.fintechName}</div>
+                <div style={{fontSize:13,color:"#fff",fontWeight:600}}>{v.fintechName}</div>
                 <div style={{fontSize:11,color:"#e74c3c",marginTop:2}}>NCUA:{v.ncuaCompliance} DNA:{v.fiserDNA}</div>
               </div>
             ))}
@@ -1458,8 +1448,8 @@ function FolderView({folders,vendors,onCreateFolder,onDeleteFolder,onEditFolder,
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
         <div>
-          <h2 style={{color:"var(--text-primary)",fontFamily:"Georgia,serif",margin:"0 0 4px"}}>Problem Folders</h2>
-          <div style={{fontSize:13,color:"var(--text-dim)"}}>Group fintechs by the problem they solve. Compare and present findings per folder.</div>
+          <h2 style={{color:"#fff",fontFamily:"Georgia,serif",margin:"0 0 4px"}}>Problem Folders</h2>
+          <div style={{fontSize:13,color:"#445"}}>Group fintechs by the problem they solve. Compare and present findings per folder.</div>
         </div>
       </div>
 
@@ -1486,10 +1476,10 @@ function FolderView({folders,vendors,onCreateFolder,onDeleteFolder,onEditFolder,
 
       {/* Folder grid */}
       {folders.length===0?(
-        <div style={{textAlign:"center",padding:60,color:"var(--text-dim)"}}>
+        <div style={{textAlign:"center",padding:60,color:"#334"}}>
           <div style={{fontSize:40,marginBottom:12}}>📁</div>
-          <div style={{fontSize:16,color:"var(--text-dim)"}}>No folders yet</div>
-          <div style={{fontSize:13,color:"var(--text-dim)",marginTop:6}}>Create a folder above to start organizing fintechs by the problem they solve.</div>
+          <div style={{fontSize:16,color:"#556"}}>No folders yet</div>
+          <div style={{fontSize:13,color:"#334",marginTop:6}}>Create a folder above to start organizing fintechs by the problem they solve.</div>
         </div>
       ):(
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:16}}>
@@ -1510,7 +1500,7 @@ function FolderView({folders,vendors,onCreateFolder,onDeleteFolder,onEditFolder,
                       <button onClick={()=>{onEditFolder(folder.id,editName,editDesc);setEditingId(null);}}
                         style={{padding:"6px 14px",background:"#00d4aa",border:"none",borderRadius:6,color:"#000",fontWeight:700,cursor:"pointer",fontSize:13}}>Save</button>
                       <button onClick={()=>setEditingId(null)}
-                        style={{padding:"6px 14px",background:"none",border:"1px solid var(--border)",borderRadius:6,color:"var(--text-faint)",cursor:"pointer",fontSize:13}}>Cancel</button>
+                        style={{padding:"6px 14px",background:"none",border:"1px solid rgba(255,255,255,0.15)",borderRadius:6,color:"#889",cursor:"pointer",fontSize:13}}>Cancel</button>
                     </div>
                   </div>
                 ):(
@@ -1519,26 +1509,26 @@ function FolderView({folders,vendors,onCreateFolder,onDeleteFolder,onEditFolder,
                       <div style={{fontSize:18,marginRight:8}}>📁</div>
                       <div style={{display:"flex",gap:6}}>
                         <button onClick={e=>{e.stopPropagation();setEditingId(folder.id);setEditName(folder.name);setEditDesc(folder.description||"");}}
-                          style={{background:"none",border:"none",color:"var(--text-dim)",cursor:"pointer",fontSize:14,padding:"2px 6px"}}>✎</button>
+                          style={{background:"none",border:"none",color:"#445",cursor:"pointer",fontSize:14,padding:"2px 6px"}}>✎</button>
                         <button onClick={e=>{e.stopPropagation();if(window.confirm(`Delete folder "${folder.name}"? Vendors inside will not be deleted.`))onDeleteFolder(folder.id);}}
-                          style={{background:"none",border:"none",color:"var(--text-dim)",cursor:"pointer",fontSize:14,padding:"2px 6px"}}>✕</button>
+                          style={{background:"none",border:"none",color:"#446",cursor:"pointer",fontSize:14,padding:"2px 6px"}}>✕</button>
                       </div>
                     </div>
-                    <div style={{fontSize:16,fontWeight:700,color:"var(--text-primary)",marginBottom:4}}>{folder.name}</div>
-                    {folder.description&&<div style={{fontSize:12,color:"var(--text-dim)",marginBottom:10}}>{folder.description}</div>}
-                    <div style={{display:"flex",gap:14,marginTop:8,paddingTop:10,borderTop:"1px solid var(--border-subtle)"}}>
+                    <div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:4}}>{folder.name}</div>
+                    {folder.description&&<div style={{fontSize:12,color:"#556",marginBottom:10}}>{folder.description}</div>}
+                    <div style={{display:"flex",gap:14,marginTop:8,paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
                       <div style={{textAlign:"center"}}>
                         <div style={{fontSize:20,fontWeight:700,color:"#00d4aa"}}>{folderVendors.length}</div>
-                        <div style={{fontSize:10,color:"var(--text-dim)"}}>Vendors</div>
+                        <div style={{fontSize:10,color:"#445"}}>Vendors</div>
                       </div>
                       <div style={{textAlign:"center"}}>
                         <div style={{fontSize:20,fontWeight:700,color:"#4db8ff"}}>{avgScore}</div>
-                        <div style={{fontSize:10,color:"var(--text-dim)"}}>Avg Score</div>
+                        <div style={{fontSize:10,color:"#445"}}>Avg Score</div>
                       </div>
                       {topVendor&&(
                         <div style={{flex:1,textAlign:"right"}}>
-                          <div style={{fontSize:11,color:"var(--text-dim)"}}>Top Pick</div>
-                          <div style={{fontSize:13,color:"var(--text-primary)",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{topVendor.fintechName}</div>
+                          <div style={{fontSize:11,color:"#445"}}>Top Pick</div>
+                          <div style={{fontSize:13,color:"#fff",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{topVendor.fintechName}</div>
                           <div style={{fontSize:11,color:"#00d4aa"}}>{(topVendor.effortAdj||0).toFixed(2)}</div>
                         </div>
                       )}
@@ -1574,19 +1564,19 @@ function FolderDetailView({folder,vendors,onBack,onEditVendor,weights,weightLabe
     <div>
       {/* Header */}
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}>
-        <button onClick={onBack} style={{padding:"8px 14px",background:"var(--bg-input)",border:"1px solid var(--border)",borderRadius:8,color:"var(--text-faint)",cursor:"pointer",fontSize:13}}>← Back</button>
+        <button onClick={onBack} style={{padding:"8px 14px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,color:"#889",cursor:"pointer",fontSize:13}}>← Back</button>
         <div>
-          <h2 style={{color:"var(--text-primary)",fontFamily:"Georgia,serif",margin:"0 0 2px"}}>📁 {folder.name}</h2>
-          {folder.description&&<div style={{fontSize:13,color:"var(--text-dim)"}}>{folder.description}</div>}
+          <h2 style={{color:"#fff",fontFamily:"Georgia,serif",margin:"0 0 2px"}}>📁 {folder.name}</h2>
+          {folder.description&&<div style={{fontSize:13,color:"#445"}}>{folder.description}</div>}
         </div>
-        <div style={{marginLeft:"auto",fontSize:13,color:"var(--text-dim)"}}>{folderVendors.length} vendors</div>
+        <div style={{marginLeft:"auto",fontSize:13,color:"#445"}}>{folderVendors.length} vendors</div>
       </div>
 
       {folderVendors.length===0?(
         <div style={{...css.card,textAlign:"center",padding:60}}>
           <div style={{fontSize:36,marginBottom:12}}>📭</div>
-          <div style={{fontSize:15,color:"var(--text-dim)"}}>No vendors in this folder yet</div>
-          <div style={{fontSize:13,color:"var(--text-dim)",marginTop:6}}>Log a fintech and assign it to this folder from the Basic tab.</div>
+          <div style={{fontSize:15,color:"#556"}}>No vendors in this folder yet</div>
+          <div style={{fontSize:13,color:"#334",marginTop:6}}>Log a fintech and assign it to this folder from the Basic tab.</div>
         </div>
       ):(
         <>
@@ -1597,7 +1587,7 @@ function FolderDetailView({folder,vendors,onBack,onEditVendor,weights,weightLabe
               return (
                 <div key={v.id} style={{...css.card,border:`1px solid ${i===0?"rgba(0,212,170,0.3)":"rgba(255,255,255,0.07)"}`,background:i===0?"rgba(0,212,170,0.05)":"rgba(255,255,255,0.03)"}}>
                   {i===0&&<div style={{fontSize:10,color:"#00d4aa",fontWeight:700,marginBottom:4,textTransform:"uppercase",letterSpacing:"0.08em"}}>🏆 Top Pick</div>}
-                  <div style={{fontSize:14,fontWeight:700,color:"var(--text-primary)",marginBottom:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{v.fintechName}</div>
+                  <div style={{fontSize:14,fontWeight:700,color:"#fff",marginBottom:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{v.fintechName}</div>
                   <div style={{fontSize:22,fontWeight:700,color:"#00d4aa"}}>{(v.effortAdj||0).toFixed(2)}</div>
                   <span style={{padding:"2px 8px",borderRadius:4,background:`${grade.color}22`,color:grade.color,fontSize:12,fontWeight:700}}>{grade.grade}</span>
                   <div style={{fontSize:11,color:v.mustHave?"#2ecc71":"#e74c3c",marginTop:6}}>{v.mustHave?"✓ Must-Haves":"✗ Must-Haves"}</div>
@@ -1611,20 +1601,20 @@ function FolderDetailView({folder,vendors,onBack,onEditVendor,weights,weightLabe
           {/* Head-to-head comparison table */}
           <div style={{...css.card,marginBottom:24,overflowX:"auto"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-              <h3 style={{margin:0,fontSize:13,color:"var(--text-muted)",textTransform:"uppercase",letterSpacing:"0.1em"}}>Head-to-Head Comparison</h3>
-              <select value={sortBy} onChange={e=>setSortBy(e.target.value)} style={{...{background:"var(--bg-panel2)",border:"1px solid var(--border)",borderRadius:6,padding:"6px 10px",color:"var(--text-primary)",fontSize:12}}}>
+              <h3 style={{margin:0,fontSize:13,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.1em"}}>Head-to-Head Comparison</h3>
+              <select value={sortBy} onChange={e=>setSortBy(e.target.value)} style={{...{background:"#0f1923",border:"1px solid rgba(255,255,255,0.1)",borderRadius:6,padding:"6px 10px",color:"#fff",fontSize:12}}}>
                 <option value="effortAdj">Sort: Effort Adj</option>
                 <option value="weighted">Sort: Weighted</option>
               </select>
             </div>
             <table style={{width:"100%",borderCollapse:"collapse",minWidth:500}}>
               <thead>
-                <tr style={{borderBottom:"1px solid var(--border-subtle)"}}>
-                  <th style={{textAlign:"left",padding:"8px 10px",fontSize:11,color:"var(--text-dim)",textTransform:"uppercase"}}>Criteria</th>
+                <tr style={{borderBottom:"1px solid rgba(255,255,255,0.08)"}}>
+                  <th style={{textAlign:"left",padding:"8px 10px",fontSize:11,color:"#446",textTransform:"uppercase"}}>Criteria</th>
                   {sorted.map(v=>(
-                    <th key={v.id} style={{textAlign:"center",padding:"8px 10px",fontSize:13,color:"var(--text-primary)",fontWeight:700,minWidth:100}}>
+                    <th key={v.id} style={{textAlign:"center",padding:"8px 10px",fontSize:13,color:"#fff",fontWeight:700,minWidth:100}}>
                       {v.fintechName}
-                      <div style={{fontSize:10,color:"var(--text-dim)",fontWeight:400}}>{(v.effortAdj||0).toFixed(2)}</div>
+                      <div style={{fontSize:10,color:"#556",fontWeight:400}}>{(v.effortAdj||0).toFixed(2)}</div>
                     </th>
                   ))}
                 </tr>
@@ -1635,8 +1625,8 @@ function FolderDetailView({folder,vendors,onBack,onEditVendor,weights,weightLabe
                   const vals=sorted.map(v=>v[k]||0);
                   const best=Math.max(...vals);
                   return (
-                    <tr key={k} style={{borderBottom:"1px solid var(--border-subtle)"}}>
-                      <td style={{padding:"8px 10px",fontSize:12,color:"var(--text-muted)"}}>{allCriteriaLabels[k]||k}</td>
+                    <tr key={k} style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                      <td style={{padding:"8px 10px",fontSize:12,color:"#8899aa"}}>{allCriteriaLabels[k]||k}</td>
                       {sorted.map((v,i)=>{
                         const val=v[k]||0;
                         const isBest=val===best&&best>0;
@@ -1650,8 +1640,8 @@ function FolderDetailView({folder,vendors,onBack,onEditVendor,weights,weightLabe
                   );
                 })}
                 {/* Effort row */}
-                <tr style={{borderBottom:"1px solid var(--border-subtle)",background:"rgba(255,255,255,0.02)"}}>
-                  <td style={{padding:"8px 10px",fontSize:12,color:"var(--text-muted)"}}>Implementation Effort</td>
+                <tr style={{borderBottom:"1px solid rgba(255,255,255,0.04)",background:"rgba(255,255,255,0.02)"}}>
+                  <td style={{padding:"8px 10px",fontSize:12,color:"#8899aa"}}>Implementation Effort</td>
                   {sorted.map(v=>{
                     const val=v.implementationEffort||3;
                     const best=Math.min(...sorted.map(x=>x.implementationEffort||3));
@@ -1659,8 +1649,8 @@ function FolderDetailView({folder,vendors,onBack,onEditVendor,weights,weightLabe
                   })}
                 </tr>
                 {/* Final score row */}
-                <tr style={{borderTop:"2px solid var(--border)",background:"rgba(0,212,170,0.04)"}}>
-                  <td style={{padding:"10px 10px",fontSize:13,color:"var(--text-primary)",fontWeight:700}}>Effort-Adj Score</td>
+                <tr style={{borderTop:"2px solid rgba(255,255,255,0.1)",background:"rgba(0,212,170,0.04)"}}>
+                  <td style={{padding:"10px 10px",fontSize:13,color:"#fff",fontWeight:700}}>Effort-Adj Score</td>
                   {sorted.map((v,i)=>(
                     <td key={v.id} style={{textAlign:"center",padding:"10px 10px"}}>
                       <div style={{fontSize:16,fontWeight:700,color:i===0?"#00d4aa":"#4db8ff"}}>{(v.effortAdj||0).toFixed(2)}</div>
@@ -1674,7 +1664,7 @@ function FolderDetailView({folder,vendors,onBack,onEditVendor,weights,weightLabe
 
           {/* Notes comparison */}
           <div style={css.card}>
-            <h3 style={{margin:"0 0 16px",fontSize:13,color:"var(--text-muted)",textTransform:"uppercase",letterSpacing:"0.1em"}}>Conference Notes Comparison</h3>
+            <h3 style={{margin:"0 0 16px",fontSize:13,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.1em"}}>Conference Notes Comparison</h3>
             {NOTE_FIELDS.map(({key,label})=>{
               const hasAny=sorted.some(v=>v[key]&&v[key].trim());
               if(!hasAny)return null;
@@ -1684,7 +1674,7 @@ function FolderDetailView({folder,vendors,onBack,onEditVendor,weights,weightLabe
                   <div style={{display:"grid",gridTemplateColumns:`repeat(${sorted.length},1fr)`,gap:10}}>
                     {sorted.map(v=>(
                       <div key={v.id}>
-                        <div style={{fontSize:11,color:"var(--text-dim)",marginBottom:3,fontWeight:600}}>{v.fintechName}</div>
+                        <div style={{fontSize:11,color:"#556",marginBottom:3,fontWeight:600}}>{v.fintechName}</div>
                         <div style={{fontSize:13,color:v[key]?"#c8d8e8":"#334",fontStyle:v[key]?"normal":"italic"}}>
                           {v[key]||"Not captured"}
                         </div>
@@ -1776,55 +1766,7 @@ export default function App() {
   const [importText,setImportText]=useState("");
   const [showImport,setShowImport]=useState(false);
   const [saveStatus,setSaveStatus]=useState("saved");
-  const [theme,setTheme]=useState(()=>localStorage.getItem("fs-theme")||"dark");
   const fileInputRef=useRef();
-
-  // Inject CSS vars whenever theme changes
-  useEffect(()=>{
-    const root=document.documentElement;
-    if(theme==="light"){
-      root.style.setProperty("--bg-base","#f0f4f8");
-      root.style.setProperty("--bg-panel","#ffffff");
-      root.style.setProperty("--bg-panel2","#e8eef4");
-      root.style.setProperty("--bg-input","#ffffff");
-      root.style.setProperty("--bg-header","rgba(255,255,255,0.95)");
-      root.style.setProperty("--bg-modal","#f8fafc");
-      root.style.setProperty("--bg-card","#ffffff");
-      root.style.setProperty("--bg-hover","rgba(0,0,0,0.04)");
-      root.style.setProperty("--border","rgba(0,0,0,0.1)");
-      root.style.setProperty("--border-subtle","rgba(0,0,0,0.06)");
-      root.style.setProperty("--text-primary","#0f1923");
-      root.style.setProperty("--text-secondary","#3a5068");
-      root.style.setProperty("--text-muted","#6b88a0");
-      root.style.setProperty("--text-faint","#9ab0c4");
-      root.style.setProperty("--text-dim","#4a6478");
-      root.style.setProperty("--accent","#00b894");
-      root.style.setProperty("--accent-blue","#0077cc");
-      root.style.setProperty("--accent-yellow","#d4a017");
-      root.style.setProperty("--select-bg","#f0f4f8");
-    } else {
-      root.style.setProperty("--bg-base","#080f18");
-      root.style.setProperty("--bg-panel","#0a1520");
-      root.style.setProperty("--bg-panel2","#0f1923");
-      root.style.setProperty("--bg-input","rgba(255,255,255,0.05)");
-      root.style.setProperty("--bg-header","rgba(0,0,0,0.5)");
-      root.style.setProperty("--bg-modal","#0a1520");
-      root.style.setProperty("--bg-card","rgba(255,255,255,0.03)");
-      root.style.setProperty("--bg-hover","rgba(255,255,255,0.04)");
-      root.style.setProperty("--border","rgba(255,255,255,0.1)");
-      root.style.setProperty("--border-subtle","rgba(255,255,255,0.06)");
-      root.style.setProperty("--text-primary","#c8d8e8");
-      root.style.setProperty("--text-secondary","#aabbcc");
-      root.style.setProperty("--text-muted","#8899aa");
-      root.style.setProperty("--text-faint","#667788");
-      root.style.setProperty("--text-dim","#445566");
-      root.style.setProperty("--accent","#00d4aa");
-      root.style.setProperty("--accent-blue","#4db8ff");
-      root.style.setProperty("--accent-yellow","#ffd93d");
-      root.style.setProperty("--select-bg","#0f1923");
-    }
-    localStorage.setItem("fs-theme",theme);
-  },[theme]);
 
   // ── Load from Supabase on mount + real-time subscriptions ──
   useEffect(()=>{
@@ -2015,34 +1957,30 @@ export default function App() {
     reader.readAsText(file);
   };
 
-  const s2={background:"var(--bg-panel2)",border:"1px solid var(--border)",borderRadius:8,padding:"8px 14px",color:"var(--text-primary)",fontSize:13};
+  const s2={background:"#0f1923",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"8px 14px",color:"#fff",fontSize:13};
   const pColor={High:"#ff6b6b",Medium:"#ffd93d",Low:"#6bcb77"};
   const NAV=[["dashboard","Dashboard"],["list","Vendors"],["folders","Folders"],["trend","Trends"],["board","Board"],["weights","Weights"]];
 
   return (
-    <div style={{minHeight:"100vh",background:"var(--bg-base)",color:"var(--text-primary)",fontFamily:"'Segoe UI',sans-serif"}}>
+    <div style={{minHeight:"100vh",background:"#080f18",color:"#c8d8e8",fontFamily:"'Segoe UI',sans-serif"}}>
       {/* Header */}
-      <div style={{borderBottom:"1px solid rgba(0,212,170,0.15)",padding:"0 16px",background:"var(--bg-header)",position:"sticky",top:0,zIndex:100}}>
+      <div style={{borderBottom:"1px solid rgba(0,212,170,0.15)",padding:"0 16px",background:"rgba(0,0,0,0.5)",position:"sticky",top:0,zIndex:100}}>
         <div style={{maxWidth:1300,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",height:58}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <div style={{width:30,height:30,background:"linear-gradient(135deg,#00d4aa,#0077cc)",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15}}>⚡</div>
             <div>
-              <div style={{fontSize:14,fontWeight:700,color:"var(--text-primary)",fontFamily:"Georgia,serif",lineHeight:1.2}}>FinTech Scout</div>
-              <div style={{fontSize:9,color:"var(--accent-blue)",letterSpacing:"0.1em",textTransform:"uppercase"}}>Emerging Technologies</div>
+              <div style={{fontSize:14,fontWeight:700,color:"#fff",fontFamily:"Georgia,serif",lineHeight:1.2}}>FinTech Scout</div>
+              <div style={{fontSize:9,color:"#4488aa",letterSpacing:"0.1em",textTransform:"uppercase"}}>Emerging Technologies</div>
             </div>
           </div>
           <div style={{display:"flex",gap:2}}>
             {NAV.map(([id,label])=>(
-              <button key={id} onClick={()=>setView(id)} style={{padding:"5px 10px",border:"none",borderRadius:6,background:view===id?"rgba(0,212,170,0.15)":"none",color:view===id?"var(--accent)":"var(--text-faint)",cursor:"pointer",fontSize:12,fontWeight:view===id?600:400,whiteSpace:"nowrap"}}>
+              <button key={id} onClick={()=>setView(id)} style={{padding:"5px 10px",border:"none",borderRadius:6,background:view===id?"rgba(0,212,170,0.15)":"none",color:view===id?"#00d4aa":"#667",cursor:"pointer",fontSize:12,fontWeight:view===id?600:400,whiteSpace:"nowrap"}}>
                 {label}
               </button>
             ))}
           </div>
           <div style={{display:"flex",gap:6,alignItems:"center"}}>
-            <button onClick={()=>setTheme(t=>t==="dark"?"light":"dark")} title="Toggle theme"
-              style={{padding:"6px 10px",background:"var(--bg-hover)",border:"1px solid var(--border)",borderRadius:6,color:"var(--text-muted)",cursor:"pointer",fontSize:14,lineHeight:1}}>
-              {theme==="dark"?"☀️":"🌙"}
-            </button>
             <div style={{fontSize:10,color:saveStatus==="saved"?"#2ecc71":saveStatus==="saving"?"#ffd93d":"#e74c3c",display:"flex",alignItems:"center",gap:3}}>
               <span style={{width:6,height:6,borderRadius:"50%",background:"currentColor",display:"inline-block"}}/>
               {saveStatus==="saved"?"Saved":saveStatus==="saving"?"Saving...":"Error"}
@@ -2069,21 +2007,21 @@ export default function App() {
               <div key={label} style={css.card}>
                 <div style={{fontSize:20,marginBottom:6}}>{icon}</div>
                 <div style={{fontSize:26,fontWeight:700,color,fontFamily:"Georgia,serif"}}>{value}</div>
-                <div style={{fontSize:11,color:"var(--text-dim)",textTransform:"uppercase",letterSpacing:"0.08em",marginTop:2}}>{label}</div>
+                <div style={{fontSize:11,color:"#556",textTransform:"uppercase",letterSpacing:"0.08em",marginTop:2}}>{label}</div>
               </div>
             ))}
           </div>
 
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:18,marginBottom:20}}>
             <div style={css.card}>
-              <h3 style={{margin:"0 0 14px",fontSize:13,color:"var(--text-muted)",textTransform:"uppercase",letterSpacing:"0.1em"}}>Department Breakdown</h3>
+              <h3 style={{margin:"0 0 14px",fontSize:13,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.1em"}}>Department Breakdown</h3>
               <table style={{width:"100%",borderCollapse:"collapse"}}>
-                <thead><tr style={{borderBottom:"1px solid var(--border-subtle)"}}>
-                  {["Department","Count","Avg","Pass"].map(h=><th key={h} style={{textAlign:"left",padding:"4px 0 8px",fontSize:10,color:"var(--text-dim)",textTransform:"uppercase"}}>{h}</th>)}
+                <thead><tr style={{borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
+                  {["Department","Count","Avg","Pass"].map(h=><th key={h} style={{textAlign:"left",padding:"4px 0 8px",fontSize:10,color:"#446",textTransform:"uppercase"}}>{h}</th>)}
                 </tr></thead>
                 <tbody>{deptBreakdown.map(({dept,count,avg,pass})=>(
-                  <tr key={dept} style={{borderBottom:"1px solid var(--border-subtle)"}}>
-                    <td style={{padding:"7px 0",fontSize:13,color:"var(--text-secondary)"}}>{dept}</td>
+                  <tr key={dept} style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                    <td style={{padding:"7px 0",fontSize:13,color:"#aabbcc"}}>{dept}</td>
                     <td style={{fontSize:13,color:count>0?"#00d4aa":"#334"}}>{count}</td>
                     <td style={{fontSize:13,color:"#4db8ff"}}>{avg}</td>
                     <td style={{fontSize:13,color:pass>0?"#2ecc71":"#334"}}>{pass}</td>
@@ -2092,15 +2030,15 @@ export default function App() {
               </table>
             </div>
             <div style={css.card}>
-              <h3 style={{margin:"0 0 14px",fontSize:13,color:"var(--text-muted)",textTransform:"uppercase",letterSpacing:"0.1em"}}>Top 5 by Effort-Adjusted Score</h3>
+              <h3 style={{margin:"0 0 14px",fontSize:13,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.1em"}}>Top 5 by Effort-Adjusted Score</h3>
               {enriched.slice(0,5).length===0
-                ?<div style={{color:"var(--text-dim)",fontSize:13,padding:"20px 0",textAlign:"center"}}>No vendors logged yet</div>
+                ?<div style={{color:"#334",fontSize:13,padding:"20px 0",textAlign:"center"}}>No vendors logged yet</div>
                 :enriched.slice(0,5).map((v,i)=>(
                   <div key={v.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
                     <div style={{width:22,height:22,borderRadius:"50%",background:i===0?"#00d4aa":"rgba(255,255,255,0.07)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:i===0?"#000":"#556",fontWeight:700,flexShrink:0}}>{i+1}</div>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:13,color:"var(--text-primary)",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{v.fintechName}</div>
-                      <div style={{fontSize:11,color:"var(--text-dim)"}}>{(v.departmentFocus||[]).join(", ")}</div>
+                      <div style={{fontSize:13,color:"#fff",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{v.fintechName}</div>
+                      <div style={{fontSize:11,color:"#556"}}>{(v.departmentFocus||[]).join(", ")}</div>
                     </div>
                     <span style={{padding:"1px 6px",borderRadius:4,background:`${getGrade(v.effortAdj||0).color}22`,color:getGrade(v.effortAdj||0).color,fontSize:11,fontWeight:700}}>{getGrade(v.effortAdj||0).grade}</span>
                     <div style={{fontSize:13,color:"#00d4aa",fontWeight:700}}>{(v.effortAdj||0).toFixed(2)}</div>
@@ -2113,7 +2051,7 @@ export default function App() {
 
           {/* Pipeline */}
           <div style={{...css.card,marginBottom:20}}>
-            <h3 style={{margin:"0 0 14px",fontSize:13,color:"var(--text-muted)",textTransform:"uppercase",letterSpacing:"0.1em"}}>Pipeline Overview</h3>
+            <h3 style={{margin:"0 0 14px",fontSize:13,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.1em"}}>Pipeline Overview</h3>
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               {PIPELINE_STAGES.map(stage=>{
                 const count=enriched.filter(v=>v.pipelineStage===stage).length;
@@ -2121,7 +2059,7 @@ export default function App() {
                 return(
                   <div key={stage} onClick={()=>{setFilterStage(stage);setView("list");}} style={{flex:"1 1 80px",textAlign:"center",padding:"12px 8px",background:`${STAGE_COLORS[stage]}11`,border:`1px solid ${STAGE_COLORS[stage]}33`,borderRadius:8,cursor:"pointer"}}>
                     <div style={{fontSize:20,fontWeight:700,color:STAGE_COLORS[stage]}}>{count}</div>
-                    <div style={{fontSize:10,color:"var(--text-dim)",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{stage}</div>
+                    <div style={{fontSize:10,color:"#556",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{stage}</div>
                     {vendors.length>0&&<div style={{fontSize:10,color:STAGE_COLORS[stage],marginTop:2}}>{pct}%</div>}
                   </div>
                 );
@@ -2131,12 +2069,12 @@ export default function App() {
 
           {/* Data Management */}
           <div style={{...css.card,marginBottom:20}}>
-            <h3 style={{margin:"0 0 14px",fontSize:13,color:"var(--text-muted)",textTransform:"uppercase",letterSpacing:"0.1em"}}>Data Management</h3>
+            <h3 style={{margin:"0 0 14px",fontSize:13,color:"#8899aa",textTransform:"uppercase",letterSpacing:"0.1em"}}>Data Management</h3>
             <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
               <button onClick={()=>exportCSV(enriched,weights)} style={{padding:"10px 16px",background:"rgba(0,212,170,0.1)",border:"1px solid rgba(0,212,170,0.2)",borderRadius:8,color:"#00d4aa",cursor:"pointer",fontSize:13,minHeight:44}}>📥 Export CSV</button>
               <button onClick={()=>exportJSON({vendors,folders,departments,conferences,weights,weightLabels,mustHaves})} style={{padding:"10px 16px",background:"rgba(77,184,255,0.1)",border:"1px solid rgba(77,184,255,0.2)",borderRadius:8,color:"#4db8ff",cursor:"pointer",fontSize:13,minHeight:44}}>💾 Backup JSON</button>
               <button onClick={()=>fileInputRef.current?.click()} style={{padding:"10px 16px",background:"rgba(255,215,61,0.1)",border:"1px solid rgba(255,215,61,0.2)",borderRadius:8,color:"#ffd93d",cursor:"pointer",fontSize:13,minHeight:44}}>📤 Restore JSON</button>
-              <button onClick={()=>setShowImport(true)} style={{padding:"10px 16px",background:"var(--bg-input)",border:"1px solid var(--border)",borderRadius:8,color:"var(--text-faint)",cursor:"pointer",fontSize:13,minHeight:44}}>📋 Import CSV</button>
+              <button onClick={()=>setShowImport(true)} style={{padding:"10px 16px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,color:"#889",cursor:"pointer",fontSize:13,minHeight:44}}>📋 Import CSV</button>
               <input ref={fileInputRef} type="file" accept=".json" onChange={handleRestoreJSON} style={{display:"none"}}/>
               {vendors.length>0&&<button onClick={()=>{if(window.confirm("Clear ALL vendor data? This cannot be undone.")){setVendors([]);supabase.from("vendors").delete().neq("id",0);}}} style={{padding:"10px 16px",background:"rgba(231,76,60,0.08)",border:"1px solid rgba(231,76,60,0.2)",borderRadius:8,color:"#e74c3c",cursor:"pointer",fontSize:13,minHeight:44}}>🗑 Clear All</button>}
             </div>
@@ -2146,15 +2084,15 @@ export default function App() {
           <div style={{background:"rgba(231,76,60,0.06)",border:"1px solid rgba(231,76,60,0.2)",borderRadius:10,padding:20}}>
             <h3 style={{margin:"0 0 14px",fontSize:13,color:"#e74c3c",textTransform:"uppercase",letterSpacing:"0.1em"}}>⚠ Red Flags — Must-Have Failures</h3>
             {enriched.filter(v=>!v.mustHave).length===0
-              ?<div style={{color:"var(--text-dim)",fontSize:13}}>No red flags — all vendors meet must-have requirements.</div>
+              ?<div style={{color:"#446",fontSize:13}}>No red flags — all vendors meet must-have requirements.</div>
               :<table style={{width:"100%",borderCollapse:"collapse"}}>
                 <thead><tr>{["Fintech","Departments","Failing Criteria","Score"].map(h=><th key={h} style={{textAlign:"left",padding:"4px 0 8px",fontSize:10,color:"#e74c3c",textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
                 <tbody>{enriched.filter(v=>!v.mustHave).map(v=>{
                   const failing=Object.entries(mustHaves).filter(([k,min])=>(v[k]||0)<min).map(([k])=>weightLabels[k]||k);
                   return (
                     <tr key={v.id}>
-                      <td style={{padding:"6px 0",fontSize:13,color:"var(--text-primary)"}}>{v.fintechName}</td>
-                      <td style={{fontSize:12,color:"var(--text-muted)"}}>{(v.departmentFocus||[]).join(", ")}</td>
+                      <td style={{padding:"6px 0",fontSize:13,color:"#fff"}}>{v.fintechName}</td>
+                      <td style={{fontSize:12,color:"#aaa"}}>{(v.departmentFocus||[]).join(", ")}</td>
                       <td style={{fontSize:12,color:"#e74c3c"}}>{failing.join(", ")}</td>
                       <td style={{fontSize:13,color:"#ffd93d"}}>{(v.effortAdj||0).toFixed(2)}</td>
                     </tr>
@@ -2185,21 +2123,21 @@ export default function App() {
               <option value="weighted">Weighted ↓</option>
             </select>
             <div style={{display:"flex",alignItems:"center",gap:4}}>
-              <span style={{fontSize:12,color:"var(--text-dim)"}}>Min:</span>
+              <span style={{fontSize:12,color:"#445"}}>Min:</span>
               <input type="number" min="0" max="5" step="0.5" value={minScore} onChange={e=>setMinScore(Number(e.target.value))} style={{width:52,...s2,padding:"8px 6px",minHeight:40}}/>
             </div>
-            <span style={{color:"var(--text-dim)",fontSize:12}}>{filtered.length} shown</span>
+            <span style={{color:"#445",fontSize:12}}>{filtered.length} shown</span>
           </div>
 
           {filtered.length===0
-            ?<div style={{textAlign:"center",padding:60}}><div style={{fontSize:36,marginBottom:12}}>📋</div><div style={{fontSize:15,color:"var(--text-dim)"}}>No vendors match your filters</div></div>
+            ?<div style={{textAlign:"center",padding:60}}><div style={{fontSize:36,marginBottom:12}}>📋</div><div style={{fontSize:15,color:"#556"}}>No vendors match your filters</div></div>
             :<div style={{display:"flex",flexDirection:"column",gap:8}}>
               {filtered.map(v=>(
                 <div key={v.id} style={{...css.card,display:"grid",gridTemplateColumns:"30px 1fr auto auto auto auto",alignItems:"center",gap:12,padding:"13px 16px"}}>
                   <div style={{width:26,height:26,borderRadius:"50%",background:v.rank<=3?"rgba(0,212,170,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${v.rank<=3?"rgba(0,212,170,0.3)":"rgba(255,255,255,0.08)"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:v.rank<=3?"#00d4aa":"#445",fontWeight:700}}>#{v.rank}</div>
                   <div style={{minWidth:0}}>
                     <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3,flexWrap:"wrap"}}>
-                      <span style={{fontSize:14,fontWeight:600,color:"var(--text-primary)"}}>{v.fintechName}</span>
+                      <span style={{fontSize:14,fontWeight:600,color:"#fff"}}>{v.fintechName}</span>
                       <span style={{fontSize:10,padding:"2px 6px",borderRadius:4,background:`${pColor[v.strategicPriority]}22`,color:pColor[v.strategicPriority],border:`1px solid ${pColor[v.strategicPriority]}44`}}>{v.strategicPriority}</span>
                       <span style={{fontSize:10,padding:"2px 7px",borderRadius:10,background:`${STAGE_COLORS[v.pipelineStage||"Identified"]}22`,color:STAGE_COLORS[v.pipelineStage||"Identified"]}}>{v.pipelineStage||"Identified"}</span>
                       <span style={{fontSize:11,color:v.mustHave?"#2ecc71":"#e74c3c"}}>{v.mustHave?"✓":"✗"}</span>
@@ -2211,7 +2149,7 @@ export default function App() {
                     <div style={{display:"flex",gap:8,alignItems:"center",marginTop:2,fontSize:11,flexWrap:"wrap"}}>
                       <span style={{color:v.vendorWeights?"#4488aa":"#334"}}>{v.vendorWeights?"📌 Own model":"📋 Global model"}</span>
                       {v.website&&<a href={v.website.startsWith("http")?v.website:"https://"+v.website} target="_blank" rel="noopener noreferrer" style={{color:"#00d4aa",textDecoration:"none"}}>🌐 {v.website.replace(/^https?:\/\//,"").replace(/\/$/,"")}</a>}
-                      {v.notes&&<span style={{color:"var(--text-dim)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:260}}>· {v.notes}</span>}
+                      {v.notes&&<span style={{color:"#445",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:260}}>· {v.notes}</span>}
                     </div>
                   </div>
                   <div style={{textAlign:"right"}}>
@@ -2220,9 +2158,9 @@ export default function App() {
                   </div>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:3,width:96}}>
                     {[["DNA",v.fiserDNA],["NCUA",v.ncuaCompliance],["Alkami",v.alkami],["Merit.",v.meridianLink],["Intl",v.internationalSupport],["Dept",v.departmentFit]].map(([lbl,val])=>(
-                      <div key={lbl} style={{textAlign:"center",background:"var(--bg-hover)",borderRadius:4,padding:"2px 0"}}>
+                      <div key={lbl} style={{textAlign:"center",background:"rgba(255,255,255,0.04)",borderRadius:4,padding:"2px 0"}}>
                         <div style={{fontSize:11,fontWeight:700,color:val>=4?"#00d4aa":val>=3?"#ffd93d":"#e74c3c"}}>{val}</div>
-                        <div style={{fontSize:8,color:"var(--text-dim)"}}>{lbl}</div>
+                        <div style={{fontSize:8,color:"#334"}}>{lbl}</div>
                       </div>
                     ))}
                   </div>
@@ -2240,21 +2178,21 @@ export default function App() {
         {view==="board"&&<BoardSummary vendors={enriched}/>}
         {view==="weights"&&<WeightsEditor weights={weights} weightLabels={weightLabels} onChange={handleWeightsChange} onLabelsChange={handleWeightLabelsChange} mustHaves={mustHaves} onMustHavesChange={handleMustHavesChange}/>}
         {view==="folders"&&<FolderView folders={folders} vendors={enriched} onCreateFolder={createFolder} onDeleteFolder={deleteFolder} onEditFolder={editFolder} onOpenFolder={openFolder} />}
-        {view==="folderDetail"&&(()=>{const f=folders.find(x=>x.id===activeFolderId||String(x.id)===String(activeFolderId));return f?<FolderDetailView folder={f} vendors={enriched} onBack={()=>setView("folders")} onEditVendor={v=>{setEditItem(v);setQuickMode(false);setShowForm(true);}} weights={weights} weightLabels={weightLabels} mustHaves={mustHaves}/>:<div style={{color:"var(--text-dim)",padding:40}}>Folder not found.</div>;})()}
+        {view==="folderDetail"&&(()=>{const f=folders.find(x=>x.id===activeFolderId||String(x.id)===String(activeFolderId));return f?<FolderDetailView folder={f} vendors={enriched} onBack={()=>setView("folders")} onEditVendor={v=>{setEditItem(v);setQuickMode(false);setShowForm(true);}} weights={weights} weightLabels={weightLabels} mustHaves={mustHaves}/>:<div style={{color:"#556",padding:40}}>Folder not found.</div>;})()}
       </div>
 
       {/* Swipe Mode */}
       {showSwipe&&(
         <Modal onClose={()=>setShowSwipe(false)}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-            <h3 style={{color:"var(--text-primary)",margin:0,fontFamily:"Georgia,serif"}}>👆 Swipe Triage</h3>
-            <button onClick={()=>setShowSwipe(false)} style={{background:"none",border:"none",color:"var(--text-dim)",fontSize:22,cursor:"pointer",minWidth:44,minHeight:44}}>✕</button>
+            <h3 style={{color:"#fff",margin:0,fontFamily:"Georgia,serif"}}>👆 Swipe Triage</h3>
+            <button onClick={()=>setShowSwipe(false)} style={{background:"none",border:"none",color:"#556",fontSize:22,cursor:"pointer",minWidth:44,minHeight:44}}>✕</button>
           </div>
-          <p style={{color:"var(--text-dim)",fontSize:13,marginBottom:16}}>Swipe right (or tap Proceed) to advance to Demo Scheduled. Swipe left (or tap Pass) to mark as Passed.</p>
+          <p style={{color:"#556",fontSize:13,marginBottom:16}}>Swipe right (or tap Proceed) to advance to Demo Scheduled. Swipe left (or tap Pass) to mark as Passed.</p>
           {enriched.filter(v=>v.pipelineStage==="Identified").length===0
-            ?<div style={{textAlign:"center",padding:40,color:"var(--text-dim)"}}>
+            ?<div style={{textAlign:"center",padding:40,color:"#334"}}>
               <div style={{fontSize:32,marginBottom:8}}>✓</div>
-              <div style={{fontSize:14,color:"var(--text-dim)"}}>No vendors left in Identified stage</div>
+              <div style={{fontSize:14,color:"#556"}}>No vendors left in Identified stage</div>
             </div>
             :enriched.filter(v=>v.pipelineStage==="Identified").map(v=>(
               <SwipeCard key={v.id} vendor={v}
@@ -2289,15 +2227,15 @@ export default function App() {
         <Modal onClose={()=>setDupeWarning(null)}>
           <div style={{padding:24,maxWidth:460}}>
             <h3 style={{color:"#ffd93d",marginBottom:8}}>⚠ Possible Duplicate Detected</h3>
-            <p style={{color:"var(--text-faint)",marginBottom:12}}>
-              "<strong style={{color:"var(--text-primary)"}}>{dupeWarning.vendor.fintechName}</strong>" is similar to {dupeWarning.dupes.length} existing vendor{dupeWarning.dupes.length>1?"s":""}:
+            <p style={{color:"#889",marginBottom:12}}>
+              "<strong style={{color:"#fff"}}>{dupeWarning.vendor.fintechName}</strong>" is similar to {dupeWarning.dupes.length} existing vendor{dupeWarning.dupes.length>1?"s":""}:
             </p>
-            <div style={{marginBottom:18,background:"var(--bg-card)",borderRadius:8,border:"1px solid var(--border-subtle)",overflow:"hidden"}}>
+            <div style={{marginBottom:18,background:"rgba(255,255,255,0.03)",borderRadius:8,border:"1px solid rgba(255,255,255,0.08)",overflow:"hidden"}}>
               {dupeWarning.dupes.slice(0,5).map((d,i)=>(
-                <div key={i} style={{padding:"10px 14px",borderBottom:i<Math.min(dupeWarning.dupes.length,5)-1?"1px solid var(--border-subtle)":"none",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div key={i} style={{padding:"10px 14px",borderBottom:i<Math.min(dupeWarning.dupes.length,5)-1?"1px solid rgba(255,255,255,0.06)":"none",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <div>
-                    <div style={{fontSize:14,color:"var(--text-primary)",fontWeight:600}}>{d.vendor.fintechName}</div>
-                    <div style={{fontSize:11,color:"var(--text-dim)",marginTop:2}}>{d.vendor.conference||"No conference"} · {d.reason}</div>
+                    <div style={{fontSize:14,color:"#fff",fontWeight:600}}>{d.vendor.fintechName}</div>
+                    <div style={{fontSize:11,color:"#556",marginTop:2}}>{d.vendor.conference||"No conference"} · {d.reason}</div>
                   </div>
                   <div style={{
                     padding:"3px 10px",borderRadius:12,fontSize:12,fontWeight:700,flexShrink:0,marginLeft:12,
@@ -2307,10 +2245,10 @@ export default function App() {
                 </div>
               ))}
             </div>
-            <p style={{color:"var(--text-faint)",fontSize:12,marginBottom:20}}>Is this a new vendor or an existing one? If it already exists, cancel and edit the existing record instead.</p>
+            <p style={{color:"#667",fontSize:12,marginBottom:20}}>Is this a new vendor or an existing one? If it already exists, cancel and edit the existing record instead.</p>
             <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
               <button onClick={()=>setDupeWarning(null)}
-                style={{padding:"12px 20px",background:"none",border:"1px solid var(--border)",color:"var(--text-faint)",borderRadius:6,cursor:"pointer",minHeight:48}}>
+                style={{padding:"12px 20px",background:"none",border:"1px solid rgba(255,255,255,0.15)",color:"#889",borderRadius:6,cursor:"pointer",minHeight:48}}>
                 Cancel — It's a duplicate
               </button>
               <button onClick={()=>{
@@ -2330,11 +2268,11 @@ export default function App() {
         <Modal onClose={()=>setDeleteConfirm(null)}>
           <div style={{textAlign:"center",padding:20}}>
             <div style={{fontSize:36,marginBottom:16}}>🗑</div>
-            <h3 style={{color:"var(--text-primary)",marginBottom:8}}>Delete this vendor?</h3>
-            <p style={{color:"var(--text-dim)",marginBottom:24}}>This cannot be undone.</p>
+            <h3 style={{color:"#fff",marginBottom:8}}>Delete this vendor?</h3>
+            <p style={{color:"#556",marginBottom:24}}>This cannot be undone.</p>
             <div style={{display:"flex",gap:10,justifyContent:"center"}}>
-              <button onClick={()=>setDeleteConfirm(null)} style={{padding:"12px 20px",background:"none",border:"1px solid var(--border)",color:"var(--text-faint)",borderRadius:6,cursor:"pointer",minHeight:48}}>Cancel</button>
-              <button onClick={()=>deleteVendor(deleteConfirm)} style={{padding:"12px 20px",background:"#e74c3c",border:"none",color:"var(--text-primary)",borderRadius:6,cursor:"pointer",fontWeight:700,minHeight:48}}>Delete</button>
+              <button onClick={()=>setDeleteConfirm(null)} style={{padding:"12px 20px",background:"none",border:"1px solid rgba(255,255,255,0.15)",color:"#889",borderRadius:6,cursor:"pointer",minHeight:48}}>Cancel</button>
+              <button onClick={()=>deleteVendor(deleteConfirm)} style={{padding:"12px 20px",background:"#e74c3c",border:"none",color:"#fff",borderRadius:6,cursor:"pointer",fontWeight:700,minHeight:48}}>Delete</button>
             </div>
           </div>
         </Modal>
@@ -2344,15 +2282,15 @@ export default function App() {
       {showImport&&(
         <Modal onClose={()=>setShowImport(false)}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-            <h3 style={{color:"var(--text-primary)",margin:0,fontFamily:"Georgia,serif"}}>Import CSV</h3>
-            <button onClick={()=>setShowImport(false)} style={{background:"none",border:"none",color:"var(--text-dim)",fontSize:22,cursor:"pointer",minWidth:44,minHeight:44}}>✕</button>
+            <h3 style={{color:"#fff",margin:0,fontFamily:"Georgia,serif"}}>Import CSV</h3>
+            <button onClick={()=>setShowImport(false)} style={{background:"none",border:"none",color:"#556",fontSize:22,cursor:"pointer",minWidth:44,minHeight:44}}>✕</button>
           </div>
-          <p style={{color:"var(--text-dim)",fontSize:13,marginBottom:14}}>Paste CSV rows — one vendor per line. Columns: Name, Departments (pipe-separated), Conference, Date, Int'l, NCUA, Scale, DNA, Alkami, MeridianLink, DeptFit, Effort, -, -, -, -, Priority, Stage, NextStep, CUs, AssetSize, Reference, Notes</p>
+          <p style={{color:"#556",fontSize:13,marginBottom:14}}>Paste CSV rows — one vendor per line. Columns: Name, Departments (pipe-separated), Conference, Date, Int'l, NCUA, Scale, DNA, Alkami, MeridianLink, DeptFit, Effort, -, -, -, -, Priority, Stage, NextStep, CUs, AssetSize, Reference, Notes</p>
           <textarea value={importText} onChange={e=>setImportText(e.target.value)} rows={7}
             placeholder="Zest AI,Consumer Lending|Risk Management,Finovate Spring 2025,2025-05-01,4,4,4,4,3,3,4,2,,,,, High,Demo Scheduled,Schedule Demo,5 CUs,$500M-2B,John Smith,Great AI underwriting"
             style={{...css.input,resize:"vertical",fontFamily:"monospace",fontSize:12}}/>
           <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:14}}>
-            <button onClick={()=>setShowImport(false)} style={{padding:"12px 20px",background:"none",border:"1px solid var(--border)",color:"var(--text-faint)",borderRadius:6,cursor:"pointer",minHeight:48}}>Cancel</button>
+            <button onClick={()=>setShowImport(false)} style={{padding:"12px 20px",background:"none",border:"1px solid rgba(255,255,255,0.15)",color:"#889",borderRadius:6,cursor:"pointer",minHeight:48}}>Cancel</button>
             <button onClick={handleImport} style={{padding:"12px 20px",background:"#00d4aa",border:"none",color:"#000",borderRadius:6,cursor:"pointer",fontWeight:700,minHeight:48}}>Import</button>
           </div>
         </Modal>
