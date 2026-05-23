@@ -1895,6 +1895,19 @@ function BriefingView() {
             <div key={i} style={sectionCard}>
               <p style={sectionLabel}>{sec.label}</p>
               <p style={sectionContent}>{sec.content}</p>
+              {sec.sources && sec.sources.length > 0 && (
+                <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--border-subtle)" }}>
+                  <div style={{ fontSize: 10, color: "var(--text-dim)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Further reading</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {sec.sources.map((src, j) => (
+                      <a key={j} href={src.url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--accent-blue)", textDecoration: "none", display: "flex", alignItems: "baseline", gap: 5 }}>
+                        <span style={{ color: "var(--text-dim)", fontSize: 10 }}>↗</span>
+                        <span style={{ borderBottom: "1px solid transparent" }} onMouseOver={e=>e.target.style.borderBottomColor="var(--accent-blue)"} onMouseOut={e=>e.target.style.borderBottomColor="transparent"}>{src.title}</span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
 
