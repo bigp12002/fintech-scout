@@ -1760,15 +1760,6 @@ const BRIEFING_FOCUS_AREAS = [
   { key: "ai",        label: "AI best practices for CUs" },
 ];
 
-function extractBriefingJSON(text) {
-  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fenceMatch) text = fenceMatch[1];
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start !== -1 && end !== -1) return text.slice(start, end + 1);
-  return text.trim();
-}
-
 function BriefingView() {
   const [active, setActive] = useState(BRIEFING_FOCUS_AREAS.map((f) => f.key));
   const [status, setStatus] = useState("idle"); // idle | loading | done | error
@@ -1804,11 +1795,10 @@ function BriefingView() {
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `API error ${res.status}`);
-      if (!data.text) throw new Error("No content returned from API");
+      if (!data.sections) throw new Error(data.error || "No sections returned from API");
 
-      const jsonStr = extractBriefingJSON(data.text);
-      const parsed = JSON.parse(jsonStr);
-      setBriefing(parsed);
+      // Server now parses JSON and returns structured data directly
+      setBriefing({ sections: data.sections, bottom_line: data.bottom_line });
       setGeneratedDate(dateStr);
       setStatus("done");
     } catch (err) {
