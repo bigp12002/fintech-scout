@@ -1758,6 +1758,10 @@ const BRIEFING_FOCUS_AREAS = [
   { key: "investing", label: "Investing options" },
   { key: "crypto",    label: "Stablecoin & crypto" },
   { key: "ai",        label: "AI best practices for CUs" },
+  { key: "regtech",   label: "Regtech & compliance" },
+  { key: "analytics", label: "Data & analytics platforms" },
+  { key: "workforce", label: "Workforce & staff development" },
+  { key: "deposits",  label: "Deposit & account operations" },
 ];
 
 function BriefingView() {
