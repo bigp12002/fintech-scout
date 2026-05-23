@@ -1747,183 +1747,6 @@ function findPotentialDupes(name, vendors, excludeId=null) {
   return results.sort((a,b)=>b.score-a.score);
 }
 
-// ─── Briefing View ────────────────────────────────────────────────────────────
-
-const BRIEFING_FOCUS_AREAS = [
-  { key: "payments",  label: "Payments & digital wallets" },
-  { key: "lending",   label: "Lending & underwriting AI" },
-  { key: "fraud",     label: "Fraud & cybersecurity" },
-  { key: "member",    label: "Member experience" },
-  { key: "core",      label: "Core banking modernization" },
-  { key: "investing", label: "Investing options" },
-  { key: "crypto",    label: "Stablecoin & crypto" },
-  { key: "ai",        label: "AI best practices for CUs" },
-];
-
-function extractBriefingJSON(text) {
-  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fenceMatch) text = fenceMatch[1];
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start !== -1 && end !== -1) return text.slice(start, end + 1);
-  return text.trim();
-}
-
-function BriefingView() {
-  const [active, setActive] = useState(BRIEFING_FOCUS_AREAS.map((f) => f.key));
-  const [status, setStatus] = useState("idle"); // idle | loading | done | error
-  const [briefing, setBriefing] = useState(null);
-  const [errorMsg, setErrorMsg] = useState("");
-  const [generatedDate, setGeneratedDate] = useState("");
-
-  const toggle = (key) =>
-    setActive((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
-    );
-
-  const run = async () => {
-    if (!active.length) return;
-    setStatus("loading");
-    setBriefing(null);
-    setErrorMsg("");
-
-    const dateStr = new Date().toLocaleDateString("en-US", {
-      month: "long", day: "numeric", year: "numeric",
-    });
-
-    const focusAreas = BRIEFING_FOCUS_AREAS
-      .filter((f) => active.includes(f.key))
-      .map((f) => f.label);
-
-    try {
-      const res = await fetch("/api/briefing", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ focusAreas, dateStr }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `API error ${res.status}`);
-      if (!data.text) throw new Error("No content returned from API");
-
-      const jsonStr = extractBriefingJSON(data.text);
-      const parsed = JSON.parse(jsonStr);
-      setBriefing(parsed);
-      setGeneratedDate(dateStr);
-      setStatus("done");
-    } catch (err) {
-      setErrorMsg(err.message);
-      setStatus("error");
-    }
-  };
-
-  const today = new Date().toLocaleDateString("en-US", {
-    weekday: "long", year: "numeric", month: "long", day: "numeric",
-  });
-
-  const sectionCard = { background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: 10, padding: "16px 20px", marginBottom: 12 };
-  const sectionLabel = { fontSize: 10, color: "var(--accent)", letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 8px", fontWeight: 600 };
-  const sectionContent = { fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.75, margin: 0, whiteSpace: "pre-wrap" };
-
-  return (
-    <div style={{ maxWidth: 860, margin: "0 auto" }}>
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12, marginBottom: 24 }}>
-        <div>
-          <div style={{ fontSize: 10, color: "var(--accent-blue)", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 4 }}>
-            BFSFCU · VP Emerging Technologies
-          </div>
-          <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)", fontFamily: "Georgia,serif", margin: "0 0 4px" }}>
-            Fintech Intelligence Briefing
-          </h2>
-          <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{today}</div>
-        </div>
-        <button
-          onClick={run}
-          disabled={status === "loading"}
-          style={{
-            padding: "10px 20px", background: status === "loading" ? "var(--bg-hover)" : "#00d4aa",
-            border: "none", borderRadius: 8, color: status === "loading" ? "var(--text-muted)" : "#000",
-            fontSize: 13, fontWeight: 700, cursor: status === "loading" ? "not-allowed" : "pointer", whiteSpace: "nowrap",
-          }}
-        >
-          {status === "loading" ? "Generating..." : status === "done" ? "↻ Refresh Briefing" : "⚡ Generate Briefing"}
-        </button>
-      </div>
-
-      {/* Focus area chips */}
-      <div style={{ fontSize: 11, color: "var(--text-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>
-        Focus Areas
-      </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 24 }}>
-        {BRIEFING_FOCUS_AREAS.map((f) => (
-          <button
-            key={f.key}
-            onClick={() => toggle(f.key)}
-            style={{
-              fontSize: 12, padding: "5px 14px", borderRadius: 999, cursor: "pointer",
-              border: `1px solid ${active.includes(f.key) ? "#00d4aa" : "var(--border)"}`,
-              background: active.includes(f.key) ? "rgba(0,212,170,0.12)" : "var(--bg-card)",
-              color: active.includes(f.key) ? "#00d4aa" : "var(--text-muted)",
-              fontWeight: active.includes(f.key) ? 600 : 400,
-            }}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ borderTop: "1px solid var(--border-subtle)", marginBottom: 24 }} />
-
-      {/* States */}
-      {status === "idle" && (
-        <div style={{ textAlign: "center", padding: "4rem 1rem", color: "var(--text-dim)" }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>📡</div>
-          <div style={{ fontSize: 14 }}>Select your focus areas and generate your daily briefing.</div>
-        </div>
-      )}
-
-      {status === "loading" && (
-        <div style={{ textAlign: "center", padding: "4rem 1rem", color: "var(--text-muted)" }}>
-          <div style={{ fontSize: 13 }}>Searching across {active.length} focus areas for today's top stories...</div>
-        </div>
-      )}
-
-      {status === "error" && (
-        <div style={{ background: "rgba(231,76,60,0.1)", border: "1px solid rgba(231,76,60,0.2)", borderRadius: 8, padding: "14px 18px", color: "#e74c3c", fontSize: 14 }}>
-          Error: {errorMsg}
-        </div>
-      )}
-
-      {status === "done" && briefing && (
-        <div>
-          <div style={{ fontSize: 11, color: "var(--text-dim)", marginBottom: 16 }}>
-            Generated {generatedDate} · {briefing.sections?.length || 0} focus areas covered
-          </div>
-
-          {(briefing.sections || []).map((sec, i) => (
-            <div key={i} style={sectionCard}>
-              <p style={sectionLabel}>{sec.label}</p>
-              <p style={sectionContent}>{sec.content}</p>
-            </div>
-          ))}
-
-          {briefing.bottom_line && (
-            <div style={{ ...sectionCard, borderColor: "rgba(0,212,170,0.25)", background: "rgba(0,212,170,0.05)", marginTop: 16 }}>
-              <p style={sectionLabel}>Bottom Line</p>
-              <p style={{ ...sectionContent, color: "var(--text-primary)", fontWeight: 600 }}>{briefing.bottom_line}</p>
-            </div>
-          )}
-
-          <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 16, textAlign: "right" }}>
-            Powered by live web search · Refresh for updated results
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -2194,7 +2017,7 @@ export default function App() {
 
   const s2={background:"var(--bg-panel2)",border:"1px solid var(--border)",borderRadius:8,padding:"8px 14px",color:"var(--text-primary)",fontSize:13};
   const pColor={High:"#ff6b6b",Medium:"#ffd93d",Low:"#6bcb77"};
-  const NAV=[["dashboard","Dashboard"],["list","Vendors"],["folders","Folders"],["trend","Trends"],["board","Board"],["weights","Weights"],["briefing","Briefing"]];
+  const NAV=[["dashboard","Dashboard"],["list","Vendors"],["folders","Folders"],["trend","Trends"],["board","Board"],["weights","Weights"]];
 
   return (
     <div style={{minHeight:"100vh",background:"var(--bg-base)",color:"var(--text-primary)",fontFamily:"'Segoe UI',sans-serif"}}>
@@ -2418,7 +2241,6 @@ export default function App() {
         {view==="weights"&&<WeightsEditor weights={weights} weightLabels={weightLabels} onChange={handleWeightsChange} onLabelsChange={handleWeightLabelsChange} mustHaves={mustHaves} onMustHavesChange={handleMustHavesChange}/>}
         {view==="folders"&&<FolderView folders={folders} vendors={enriched} onCreateFolder={createFolder} onDeleteFolder={deleteFolder} onEditFolder={editFolder} onOpenFolder={openFolder} />}
         {view==="folderDetail"&&(()=>{const f=folders.find(x=>x.id===activeFolderId||String(x.id)===String(activeFolderId));return f?<FolderDetailView folder={f} vendors={enriched} onBack={()=>setView("folders")} onEditVendor={v=>{setEditItem(v);setQuickMode(false);setShowForm(true);}} weights={weights} weightLabels={weightLabels} mustHaves={mustHaves}/>:<div style={{color:"var(--text-dim)",padding:40}}>Folder not found.</div>;})()}
-        {view==="briefing"&&<BriefingView/>}
       </div>
 
       {/* Swipe Mode */}
